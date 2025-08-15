@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宇宙射擊遊戲</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 20px #00ffff;
+        }
+        
+        #gameCanvas {
+            background: linear-gradient(to bottom, #000011 0%, #000033 50%, #000066 100%);
+            display: block;
+        }
+        
+        #gameUI {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            color: #00ffff;
+            font-size: 18px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 30px;
+            border: 2px solid #ff0000;
+            border-radius: 10px;
+            display: none;
+            z-index: 20;
+        }
+        
+        #startScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border: 2px solid #00ffff;
+            border-radius: 15px;
+            z-index: 30;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #00ffff, #0088ff);
+            border: none;
+            color: #000;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 20px #00ffff;
+        }
+        
+        .controls {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #aaa;
+        }
+        
+        .powerup-indicator {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 14px;
+            color: #ffff00;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="gameUI">
+            <div>生命值: <span id="health">100/100</span></div>
+            <div>分數: <span id="score">0</span></div>
+            <div>等級: <span id="level">1</span></div>
+        </div>
+        
+        <div id="powerup-indicator" class="powerup-indicator"></div>
+        
+        <div id="startScreen">
+            <h1 style="color: #00ffff; margin-bottom: 30px; text-shadow: 0 0 20px #00ffff;">🚀 宇宙射擊遊戲 🚀</h1>
+            <button onclick="startGame()">開始遊戲</button>
+            <div class="controls">
+                <p>操作說明：</p>
+                <p>WASD 或 方向鍵 - 移動飛船</p>
+                <p>空白鍵 - 射擊</p>
+                <p>消滅敵人獲得分數和道具！</p>
+            </div>
+        </div>
+        
+        <div id="gameOver">
+            <h2 style="color: #ff0000;">遊戲結束！</h2>
+            <p>最終分數: <span id="finalScore">0</span></p>
+            <p>達到等級: <span id="finalLevel">1</span></p>
+            <button onclick="restartGame()">重新開始</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 遊戲狀態
+        let gameState = 'start'; // 'start', 'playing', 'gameOver', 'victory'
+        let score = 0;
+        let level = 1;
+        let health = 100;
+        let maxHealth = 100; // 新增最大血量變數
+        let keys = {};
+        let lastTime = 0;
+        
+        // 玩家飛船
+        const player = {
+            x: 375,
+            y: 500,
+            width: 50,
+            height: 50,
+            speed: 5,
+            fireRate: 200,
+            lastFire: 0,
+            powerLevel: 1
+        };
+        
+        // 遊戲物件陣列
+        let bullets = [];
+        let enemies = [];
+        let powerups = [];
+        let particles = [];
+        let stars = [];
+        
+        // 初始化星星背景
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < 100; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    speed: Math.random() * 2 + 0.5,
+                    brightness: Math.random()
+                });
+            }
+        }
+        
+        // 鍵盤事件
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'Space') {
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+        
+        // 射擊函數
+        function shoot() {
+            const now = Date.now();
+            if (now - player.lastFire > player.fireRate) {
+                createBulletPattern();
+                player.lastFire = now;
+            }
+        }
+        
+        // 創建不同等級的子彈模式
+        function createBulletPattern() {
+            const centerX = player.x + player.width / 2;
+            const centerY = player.y;
+            const time = Date.now() * 0.01;
+            
+            // 根據等級範圍決定武器模式
+            if (player.powerLevel <= 10) {
+                // 1-10等：基礎武器
+                createBasicWeapons(centerX, centerY, player.powerLevel);
+            } else if (player.powerLevel <= 25) {
+                // 11-25等：元素武器
+                createElementalWeapons(centerX, centerY, player.powerLevel, time);
+            } else if (player.powerLevel <= 50) {
+                // 26-50等：能量武器
+                createEnergyWeapons(centerX, centerY, player.powerLevel, time);
+            } else if (player.powerLevel <= 75) {
+                // 51-75等：魔法武器
+                createMagicWeapons(centerX, centerY, player.powerLevel, time);
+            } else if (player.powerLevel <= 99) {
+                // 76-99等：傳說武器
+                createLegendaryWeapons(centerX, centerY, player.powerLevel, time);
+            } else if (player.powerLevel === 100) {
+                // 100等：終極武器
+                createUltimateWeapon(centerX, centerY, time);
+            }
+        }
+        
+        // 1-10等：基礎武器
+        function createBasicWeapons(centerX, centerY, level) {
+            const bulletCount = Math.min(level, 10);
+            const spread = 0.3;
+            
+            for (let i = 0; i < bulletCount; i++) {
+                const angle = (i - (bulletCount - 1) / 2) * spread / bulletCount;
+                const color = `hsl(${60 + level * 5}, 100%, 50%)`;
+                createBullet(centerX - 2, centerY, angle, color, 1, 'basic');
+            }
+        }
+        
+        // 11-25等：元素武器
+        function createElementalWeapons(centerX, centerY, level, time) {
+            const elementType = Math.floor((level - 11) / 5);
+            const bulletCount = 5 + (level - 10);
+            
+            switch (elementType) {
+                case 0: // 火元素 (11-15等)
+                    for (let i = 0; i < bulletCount; i++) {
+                        const angle = (i - (bulletCount - 1) / 2) * 0.2;
+                        createBullet(centerX - 2, centerY, angle, '#ff4400', 1 + Math.floor(level / 5), 'fire');
+                        if (Math.random() < 0.3) {
+                            createBullet(centerX + Math.sin(time + i) * 15, centerY, angle, '#ff6600', 1 + Math.floor(level / 6), 'fireball');
+                        }
+                    }
+                    break;
+                case 1: // 冰元素 (16-20等)
+                    for (let i = 0; i < bulletCount; i++) {
+                        const angle = (i - (bulletCount - 1) / 2) * 0.15;
+                        createBullet(centerX - 2, centerY, angle, '#00aaff', 1 + Math.floor(level / 5), 'ice');
+                    }
+                    break;
+                case 2: // 雷元素 (21-25等)
+                    for (let i = 0; i < bulletCount; i++) {
+                        const angle = Math.sin(time + i) * 0.5;
+                        createBullet(centerX + Math.sin(time + i) * 20, centerY, angle, '#ffff00', 1 + Math.floor(level / 4), 'lightning');
+                    }
+                    break;
+            }
+        }
+        
+        // 26-50等：能量武器
+        function createEnergyWeapons(centerX, centerY, level, time) {
+            const weaponType = Math.floor((level - 26) / 8);
+            const intensity = level - 25;
+            
+            switch (weaponType) {
+                case 0: // 激光陣列 (26-33等)
+                    for (let i = 0; i < 8 + intensity; i++) {
+                        const angle = (i * Math.PI / (4 + intensity)) - Math.PI/2;
+                        createBullet(centerX, centerY, Math.sin(angle), '#ff0066', 2 + Math.floor(level / 8), 'laser');
+                    }
+                    break;
+                case 1: // 電漿炮 (34-41等)
+                    for (let i = 0; i < 6; i++) {
+                        const radius = 30 + Math.sin(time + i) * 15;
+                        const angle = (i * Math.PI / 3) + time;
+                        const x = centerX + Math.cos(angle) * radius;
+                        const y = centerY + Math.sin(angle) * 10;
+                        createBullet(x, y, 0, '#6600ff', 2 + Math.floor(level / 7), 'plasma');
+                    }
+                    break;
+                case 2: // 能量風暴 (42-50等)
+                    for (let i = 0; i < 12 + intensity; i++) {
+                        const angle = (i * Math.PI / 6) + time;
+                        const distance = 20 + Math.sin(time * 2 + i) * 25;
+                        createBullet(centerX + Math.cos(angle) * distance, centerY, Math.sin(angle) * 0.3, '#00ffff', 3 + Math.floor(level / 6), 'energy');
+                    }
+                    break;
+            }
+        }
+        
+        // 51-75等：魔法武器
+        function createMagicWeapons(centerX, centerY, level, time) {
+            const spellType = Math.floor((level - 51) / 8);
+            
+            switch (spellType) {
+                case 0: // 星爆術 (51-58等)
+                    for (let i = 0; i < 16; i++) {
+                        const angle = (i * Math.PI / 8) + time;
+                        const distance = 15 + Math.sin(time * 3 + i) * 20;
+                        createBullet(centerX + Math.cos(angle) * distance, centerY, Math.sin(angle), '#ffaa00', 4 + Math.floor(level / 5), 'star');
+                    }
+                    break;
+                case 1: // 時空扭曲 (59-66等)
+                    for (let i = 0; i < 20; i++) {
+                        const angle = time + i * 0.3;
+                        const spiral = angle * 3;
+                        createBullet(centerX + Math.cos(spiral) * (i * 2), centerY, Math.sin(angle), '#aa00ff', 5 + Math.floor(level / 4), 'portal');
+                    }
+                    break;
+                case 2: // 彗星雨 (67-75等)
+                    for (let i = 0; i < 25; i++) {
+                        const x = centerX + (Math.random() - 0.5) * 100;
+                        const angle = (Math.random() - 0.5) * 0.8;
+                        createBullet(x, centerY, angle, '#ff00ff', 6 + Math.floor(level / 3), 'comet');
+                    }
+                    break;
+            }
+        }
+        
+        // 76-99等：傳說武器
+        function createLegendaryWeapons(centerX, centerY, level, time) {
+            const weaponType = Math.floor((level - 76) / 8);
+            
+            switch (weaponType) {
+                case 0: // 龍息砲 (76-83等) - 簡化
+                    for (let i = 0; i < 8; i++) { // 從30減少到8
+                        const angle = (i - 3.5) * 0.3;
+                        const hue = (time * 50 + i * 45) % 360;
+                        createBullet(centerX + Math.sin(time + i) * 10, centerY, angle, `hsl(${hue}, 100%, 50%)`, 8 + Math.floor(level / 2), 'dragon');
+                    }
+                    break;
+                case 1: // 黑洞砲 (84-91等) - 簡化
+                    for (let i = 0; i < 10; i++) { // 從40減少到10
+                        const angle = (i * Math.PI / 5) + time;
+                        const distance = Math.sin(time * 2 + i) * 20;
+                        createBullet(centerX + Math.cos(angle) * distance, centerY, 0, '#000033', 10 + Math.floor(level / 2), 'blackhole');
+                    }
+                    break;
+                case 2: // 宇宙射線 (92-99等) - 簡化
+                    for (let i = 0; i < 12; i++) { // 從50減少到12
+                        const angle = (i - 5.5) * 0.2;
+                        const hue = (time * 100 + i * 30) % 360;
+                        createBullet(centerX + (i - 5.5) * 8, centerY, angle, `hsl(${hue}, 100%, 70%)`, 12 + Math.floor(level / 1.5), 'cosmic');
+                    }
+                    break;
+            }
+        }
+        
+        // 100等：終極武器 - 簡化
+        function createUltimateWeapon(centerX, centerY, time) {
+            // 終極彩虹螺旋 - 簡化
+            for (let i = 0; i < 20; i++) { // 從100減少到20
+                const angle = (i * Math.PI / 10) + time;
+                const distance = Math.sin(time + i * 0.5) * 30;
+                const hue = (time * 200 + i * 18) % 360;
+                
+                createBullet(
+                    centerX + Math.cos(angle) * distance, 
+                    centerY, 
+                    Math.sin(angle) * 0.3, 
+                    `hsl(${hue}, 100%, 50%)`, 
+                    15,
+                    'ultimate'
+                );
+            }
+            
+            // 中心超級射線 - 簡化
+            for (let i = 0; i < 5; i++) { // 從10減少到5
+                createBullet(centerX - 2 + i, centerY, 0, '#ffffff', 20, 'godray');
+            }
+        }
+        
+        // 創建子彈
+        function createBullet(x, y, angle, color, damage, effect = 'normal') {
+            bullets.push({
+                x: x,
+                y: y,
+                width: effect === 'ultimate' ? 8 : 4,
+                height: effect === 'ultimate' ? 15 : 10,
+                speed: effect === 'ultimate' ? 12 : 8,
+                damage: damage,
+                angle: angle,
+                color: color,
+                effect: effect,
+                trail: []
+            });
+        }
+        
+        // 生成敵人
+        function spawnEnemy() {
+            const types = ['basic', 'fast', 'heavy'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            
+            let enemy = {
+                x: Math.random() * (canvas.width - 40),
+                y: -40,
+                type: type
+            };
+            
+            switch (type) {
+                case 'basic':
+                    enemy.width = 40;
+                    enemy.height = 40;
+                    enemy.speed = 2 + level * 0.5;
+                    enemy.health = 1; // 紅色怪物改為1下死，降低難度
+                    enemy.maxHealth = 1;
+                    enemy.color = '#ff4444';
+                    enemy.points = 100;
+                    break;
+                case 'fast':
+                    enemy.width = 30;
+                    enemy.height = 30;
+                    enemy.speed = 4 + level * 0.7;
+                    enemy.health = 1; // 綠色怪物保持1下死
+                    enemy.maxHealth = 1;
+                    enemy.color = '#44ff44';
+                    enemy.points = 150;
+                    break;
+                case 'heavy':
+                    enemy.width = 60;
+                    enemy.height = 60;
+                    enemy.speed = 1 + level * 0.3;
+                    enemy.health = 2; // 藍色怪物從5下死改為2下死
+                    enemy.maxHealth = 2;
+                    enemy.color = '#4444ff';
+                    enemy.points = 300;
+                    break;
+            }
+            
+            enemies.push(enemy);
+        }
+        
+        // 生成道具
+        function spawnPowerup(x, y) {
+            if (Math.random() < 0.6) { // 增加道具掉落機率從40%到60%
+                const types = ['health', 'maxhealth']; // 只保留補血和增加血量上限
+                const weights = [0.7, 0.3]; // 補血70%機率，增加血量上限30%機率
+                
+                // 根據權重選擇道具類型
+                const rand = Math.random();
+                let selectedType = rand <= 0.7 ? 'health' : 'maxhealth';
+                
+                powerups.push({
+                    x: x,
+                    y: y,
+                    width: 25,
+                    height: 25,
+                    type: selectedType,
+                    speed: 2,
+                    rotation: 0
+                });
+            }
+        }
+        
+        // 創建粒子效果
+        function createParticles(x, y, color, count = 5) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    life: 30,
+                    maxLife: 30,
+                    color: color,
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+        
+        // 更新遊戲狀態
+        function update(deltaTime) {
+            if (gameState !== 'playing') return;
+            
+            // 長按射擊
+            if (keys['Space']) {
+                shoot();
+            }
+            
+            // 更新玩家位置
+            if (keys['ArrowLeft'] || keys['KeyA']) {
+                player.x = Math.max(0, player.x - player.speed);
+            }
+            if (keys['ArrowRight'] || keys['KeyD']) {
+                player.x = Math.min(canvas.width - player.width, player.x + player.speed);
+            }
+            if (keys['ArrowUp'] || keys['KeyW']) {
+                player.y = Math.max(0, player.y - player.speed);
+            }
+            if (keys['ArrowDown'] || keys['KeyS']) {
+                player.y = Math.min(canvas.height - player.height, player.y + player.speed);
+            }
+            
+            // 檢查勝利條件
+            if (player.powerLevel >= 100) {
+                gameState = 'victory';
+                document.getElementById('finalScore').textContent = score;
+                document.getElementById('finalLevel').textContent = level;
+                document.getElementById('gameOver').querySelector('h2').textContent = '🏆 恭喜通關！ 🏆';
+                document.getElementById('gameOver').querySelector('h2').style.color = '#00ff00';
+                document.getElementById('gameOver').style.display = 'block';
+                return;
+            }
+            
+            // 更新星星
+            stars.forEach(star => {
+                star.y += star.speed;
+                if (star.y > canvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * canvas.width;
+                }
+            });
+            
+            // 更新子彈
+            bullets = bullets.filter(bullet => {
+                // 更新軌跡
+                bullet.trail.push({x: bullet.x, y: bullet.y});
+                if (bullet.trail.length > 5) {
+                    bullet.trail.shift();
+                }
+                
+                if (bullet.angle) {
+                    bullet.x += Math.sin(bullet.angle) * bullet.speed;
+                    bullet.y -= Math.cos(bullet.angle) * bullet.speed;
+                } else {
+                    bullet.y -= bullet.speed;
+                }
+                return bullet.y > -50;
+            });
+            
+            // 更新敵人
+            enemies.forEach(enemy => {
+                enemy.y += enemy.speed;
+            });
+            enemies = enemies.filter(enemy => enemy.y < canvas.height + 50);
+            
+            // 更新道具
+            powerups.forEach(powerup => {
+                powerup.y += powerup.speed;
+                powerup.rotation += 0.1;
+            });
+            powerups = powerups.filter(powerup => powerup.y < canvas.height + 50);
+            
+            // 更新粒子
+            particles = particles.filter(particle => {
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.life--;
+                particle.vx *= 0.95;
+                particle.vy *= 0.95;
+                return particle.life > 0;
+            });
+            
+            // 碰撞檢測 - 子彈與敵人
+            bullets.forEach((bullet, bulletIndex) => {
+                enemies.forEach((enemy, enemyIndex) => {
+                    if (bullet.x < enemy.x + enemy.width &&
+                        bullet.x + bullet.width > enemy.x &&
+                        bullet.y < enemy.y + enemy.height &&
+                        bullet.y + bullet.height > enemy.y) {
+                        
+                        enemy.health -= bullet.damage;
+                        bullets.splice(bulletIndex, 1);
+                        createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, enemy.color, 3);
+                        
+                        if (enemy.health <= 0) {
+                            score += enemy.points;
+                            createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, '#ffff00', 8);
+                            spawnPowerup(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
+                            enemies.splice(enemyIndex, 1);
+                        }
+                    }
+                });
+            });
+            
+            // 碰撞檢測 - 玩家與敵人
+            enemies.forEach((enemy, enemyIndex) => {
+                if (player.x < enemy.x + enemy.width &&
+                    player.x + player.width > enemy.x &&
+                    player.y < enemy.y + enemy.height &&
+                    player.y + player.height > enemy.y) {
+                    
+                    health -= 15; // 降低傷害從25到15
+                    createParticles(player.x + player.width/2, player.y + player.height/2, '#ff0000', 5);
+                    enemies.splice(enemyIndex, 1);
+                    
+                    if (health <= 0) {
+                        gameState = 'gameOver';
+                        document.getElementById('finalScore').textContent = score;
+                        document.getElementById('finalLevel').textContent = level;
+                        document.getElementById('gameOver').style.display = 'block';
+                    }
+                }
+            });
+            
+            // 碰撞檢測 - 玩家與道具
+            powerups.forEach((powerup, powerupIndex) => {
+                if (player.x < powerup.x + powerup.width &&
+                    player.x + player.width > powerup.x &&
+                    player.y < powerup.y + powerup.height &&
+                    player.y + player.height > powerup.y) {
+                    
+                    switch (powerup.type) {
+                        case 'health':
+                            health = Math.min(maxHealth, health + 25);
+                            break;
+                        case 'maxhealth':
+                            maxHealth += 25; // 增加最大血量
+                            health = Math.min(maxHealth, health + 15); // 同時回復一些血量
+                            break;
+                    }
+                    
+                    createParticles(powerup.x + powerup.width/2, powerup.y + powerup.height/2, '#00ff00', 5);
+                    powerups.splice(powerupIndex, 1);
+                }
+            });
+            
+            // 生成敵人 - 降低敵人生成頻率
+            if (Math.random() < 0.015 + level * 0.003) { // 從0.02降低到0.015
+                spawnEnemy();
+            }
+            
+            // 升級系統 - 大幅降低升級所需分數
+            const newLevel = Math.floor(score / 300) + 1; // 從1000改為300分升一級
+            if (newLevel > level) {
+                level = newLevel;
+                player.powerLevel = level; // 讓玩家武器等級跟著遊戲等級提升
+                health = Math.min(maxHealth, health + 30); // 升級回血增加到30
+                // 每5級提升射速
+                if (level % 5 === 0) {
+                    player.fireRate = Math.max(50, player.fireRate - 20); // 提升射速
+                }
+                updatePowerupIndicator(); // 更新武器顯示
+            }
+            
+            // 更新UI
+            document.getElementById('health').textContent = `${health}/${maxHealth}`;
+            document.getElementById('score').textContent = score;
+            document.getElementById('level').textContent = level;
+        }
+        
+        function updatePowerupIndicator() {
+            const indicator = document.getElementById('powerup-indicator');
+            let weaponType = '';
+            
+            if (player.powerLevel <= 10) {
+                weaponType = '基礎武器';
+            } else if (player.powerLevel <= 25) {
+                const elementTypes = ['火元素', '冰元素', '雷元素'];
+                const typeIndex = Math.floor((player.powerLevel - 11) / 5);
+                weaponType = elementTypes[typeIndex] || '元素武器';
+            } else if (player.powerLevel <= 50) {
+                const energyTypes = ['激光陣列', '電漿炮', '能量風暴'];
+                const typeIndex = Math.floor((player.powerLevel - 26) / 8);
+                weaponType = energyTypes[typeIndex] || '能量武器';
+            } else if (player.powerLevel <= 75) {
+                const magicTypes = ['星爆術', '時空扭曲', '彗星雨'];
+                const typeIndex = Math.floor((player.powerLevel - 51) / 8);
+                weaponType = magicTypes[typeIndex] || '魔法武器';
+            } else if (player.powerLevel <= 99) {
+                const legendaryTypes = ['龍息砲', '黑洞砲', '宇宙射線'];
+                const typeIndex = Math.floor((player.powerLevel - 76) / 8);
+                weaponType = legendaryTypes[typeIndex] || '傳說武器';
+            } else if (player.powerLevel === 100) {
+                weaponType = '🌟 終極武器 🌟';
+            }
+            
+            let text = `武器等級: ${player.powerLevel}/100 | ${weaponType} | 射速: ${(1000/player.fireRate).toFixed(1)}/秒`;
+            indicator.textContent = text;
+        }
+        
+        // 繪製遊戲
+        function draw() {
+            // 清空畫布
+            ctx.fillStyle = 'rgba(0, 0, 17, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 繪製星星
+            stars.forEach(star => {
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
+                ctx.fillRect(star.x, star.y, 2, 2);
+            });
+            
+            if (gameState !== 'playing') return;
+            
+            // 繪製玩家
+            ctx.save();
+            ctx.translate(player.x + player.width/2, player.y + player.height/2);
+            ctx.fillStyle = '#00ffff';
+            ctx.fillRect(-player.width/2, -player.height/2, player.width, player.height);
+            
+            // 繪製玩家細節
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-5, -player.height/2, 10, 20);
+            ctx.fillStyle = '#ffff00';
+            ctx.fillRect(-15, player.height/2 - 10, 8, 8);
+            ctx.fillRect(7, player.height/2 - 10, 8, 8);
+            ctx.restore();
+            
+            // 繪製子彈
+            bullets.forEach(bullet => {
+                // 繪製軌跡
+                if (bullet.trail.length > 1 && bullet.effect !== 'normal') {
+                    ctx.strokeStyle = bullet.color + '40';
+                    ctx.lineWidth = bullet.width / 2;
+                    ctx.beginPath();
+                    ctx.moveTo(bullet.trail[0].x + bullet.width/2, bullet.trail[0].y + bullet.height/2);
+                    for (let i = 1; i < bullet.trail.length; i++) {
+                        ctx.lineTo(bullet.trail[i].x + bullet.width/2, bullet.trail[i].y + bullet.height/2);
+                    }
+                    ctx.stroke();
+                }
+                
+                // 根據特效類型繪製不同效果
+                switch (bullet.effect) {
+                    case 'basic':
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        break;
+                        
+                    case 'fire':
+                    case 'fireball':
+                        // 火焰特效
+                        ctx.fillStyle = '#ff3300';
+                        ctx.fillRect(bullet.x - 1, bullet.y - 1, bullet.width + 2, bullet.height + 2);
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 火花粒子
+                        if (Math.random() < 0.3) {
+                            createParticles(bullet.x + bullet.width/2, bullet.y + bullet.height, '#ff6600', 1);
+                        }
+                        break;
+                        
+                    case 'ice':
+                        // 冰元素特效
+                        ctx.shadowColor = '#00aaff';
+                        ctx.shadowBlur = 8;
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        ctx.shadowBlur = 0;
+                        // 冰晶效果
+                        ctx.strokeStyle = '#aaffff80';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(bullet.x - 2, bullet.y - 2, bullet.width + 4, bullet.height + 4);
+                        break;
+                        
+                    case 'lightning':
+                        // 雷電特效
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 電流效果
+                        if (Math.random() < 0.5) {
+                            ctx.strokeStyle = '#ffffff';
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.moveTo(bullet.x, bullet.y);
+                            ctx.lineTo(bullet.x + Math.random() * 10 - 5, bullet.y + bullet.height + 5);
+                            ctx.stroke();
+                        }
+                        break;
+                        
+                    case 'laser':
+                        // 激光特效
+                        ctx.shadowColor = bullet.color;
+                        ctx.shadowBlur = 10;
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        ctx.shadowBlur = 0;
+                        break;
+                        
+                    case 'plasma':
+                        // 電漿特效
+                        const time = Date.now() * 0.01;
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 電漿環
+                        ctx.strokeStyle = bullet.color + '80';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(bullet.x + bullet.width/2, bullet.y + bullet.height/2, 
+                               8 + Math.sin(time + bullet.x) * 3, 0, Math.PI * 2);
+                        ctx.stroke();
+                        break;
+                        
+                    case 'energy':
+                        // 能量特效
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 能量光環
+                        for (let i = 0; i < 3; i++) {
+                            ctx.fillStyle = bullet.color + (60 - i * 20).toString(16);
+                            ctx.fillRect(bullet.x - i, bullet.y - i, bullet.width + i*2, bullet.height + i*2);
+                        }
+                        break;
+                        
+                    case 'star':
+                        // 星爆特效
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 星光效果
+                        ctx.strokeStyle = bullet.color;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(bullet.x + bullet.width/2, bullet.y - 5);
+                        ctx.lineTo(bullet.x + bullet.width/2, bullet.y + bullet.height + 5);
+                        ctx.moveTo(bullet.x - 5, bullet.y + bullet.height/2);
+                        ctx.lineTo(bullet.x + bullet.width + 5, bullet.y + bullet.height/2);
+                        ctx.stroke();
+                        break;
+                        
+                    case 'portal':
+                        // 時空扭曲特效
+                        const portalTime = Date.now() * 0.02;
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 扭曲環
+                        for (let i = 0; i < 3; i++) {
+                            ctx.strokeStyle = bullet.color + (80 - i * 30).toString(16);
+                            ctx.lineWidth = 2 - i * 0.5;
+                            ctx.beginPath();
+                            ctx.arc(bullet.x + bullet.width/2, bullet.y + bullet.height/2, 
+                                   5 + i * 3 + Math.sin(portalTime + i) * 2, 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
+                        break;
+                        
+                    case 'comet':
+                        // 彗星特效
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 彗星尾巴
+                        const gradient = ctx.createLinearGradient(bullet.x, bullet.y, bullet.x, bullet.y + 20);
+                        gradient.addColorStop(0, bullet.color);
+                        gradient.addColorStop(1, bullet.color + '00');
+                        ctx.fillStyle = gradient;
+                        ctx.fillRect(bullet.x - 1, bullet.y + bullet.height, bullet.width + 2, 15);
+                        break;
+                        
+                    case 'dragon':
+                        // 龍息特效
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        ctx.shadowColor = bullet.color;
+                        ctx.shadowBlur = 15;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        ctx.shadowBlur = 0;
+                        // 龍火粒子
+                        if (Math.random() < 0.4) {
+                            createParticles(bullet.x + bullet.width/2, bullet.y + bullet.height, bullet.color, 2);
+                        }
+                        break;
+                        
+                    case 'blackhole':
+                        // 黑洞特效
+                        const blackholeTime = Date.now() * 0.01;
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 重力波效果
+                        for (let i = 0; i < 5; i++) {
+                            ctx.strokeStyle = `rgba(100, 100, 255, ${(5-i)*0.1})`;
+                            ctx.lineWidth = 1;
+                            ctx.beginPath();
+                            ctx.arc(bullet.x + bullet.width/2, bullet.y + bullet.height/2, 
+                                   i * 4 + Math.sin(blackholeTime + i) * 2, 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
+                        break;
+                        
+                    case 'cosmic':
+                        // 宇宙射線特效
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        ctx.shadowColor = bullet.color;
+                        ctx.shadowBlur = 20;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        ctx.shadowBlur = 0;
+                        break;
+                        
+                    case 'godray':
+                        // 神光射線特效
+                        const godrayTime = Date.now() * 0.03;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 神聖光環
+                        ctx.strokeStyle = '#ffffff80';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.arc(bullet.x + bullet.width/2, bullet.y + bullet.height/2, 
+                               15 + Math.sin(godrayTime) * 5, 0, Math.PI * 2);
+                        ctx.stroke();
+                        break;
+                        
+                    case 'rainbow':
+                        // 彩虹特效
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 彩虹光暈
+                        ctx.shadowColor = bullet.color;
+                        ctx.shadowBlur = 15;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        ctx.shadowBlur = 0;
+                        break;
+                        
+                    case 'ultimate':
+                        // 終極特效
+                        const pulseTime = Date.now() * 0.02;
+                        const pulse = Math.sin(pulseTime) * 0.5 + 1;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(bullet.x - 2, bullet.y - 2, bullet.width + 4, bullet.height + 4);
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 脈動光環
+                        ctx.strokeStyle = '#ffffff80';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.arc(bullet.x + bullet.width/2, bullet.y + bullet.height/2, 10 * pulse, 0, Math.PI * 2);
+                        ctx.stroke();
+                        break;
+                        
+                    default:
+                        // 普通子彈
+                        ctx.fillStyle = bullet.color;
+                        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                        // 子彈光暈效果
+                        ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+                        ctx.fillRect(bullet.x - 1, bullet.y - 1, bullet.width + 2, bullet.height + 2);
+                        break;
+                }
+            });
+            
+            // 繪製敵人
+            enemies.forEach(enemy => {
+                ctx.fillStyle = enemy.color;
+                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                
+                // 繪製生命值條
+                const healthPercent = enemy.health / enemy.maxHealth;
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+                ctx.fillRect(enemy.x, enemy.y - 8, enemy.width, 4);
+                ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+                ctx.fillRect(enemy.x, enemy.y - 8, enemy.width * healthPercent, 4);
+            });
+            
+            // 繪製道具
+            powerups.forEach(powerup => {
+                ctx.save();
+                ctx.translate(powerup.x + powerup.width/2, powerup.y + powerup.height/2);
+                ctx.rotate(powerup.rotation);
+                
+                switch (powerup.type) {
+                    case 'health':
+                        ctx.fillStyle = '#ff4444';
+                        break;
+                    case 'maxhealth':
+                        // 最大血量道具 - 金色
+                        ctx.fillStyle = '#ffaa00';
+                        // 添加光環效果
+                        ctx.shadowColor = '#ffaa00';
+                        ctx.shadowBlur = 10;
+                        break;
+                }
+                
+                ctx.fillRect(-powerup.width/2, -powerup.height/2, powerup.width, powerup.height);
+                
+                // 為特殊道具添加額外視覺效果
+                if (powerup.type === 'maxhealth') {
+                    // 金色十字
+                    ctx.strokeStyle = '#ffdd00';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(-powerup.width/2, 0);
+                    ctx.lineTo(powerup.width/2, 0);
+                    ctx.moveTo(0, -powerup.height/2);
+                    ctx.lineTo(0, powerup.height/2);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+                
+                ctx.restore();
+            });
+            
+            // 繪製粒子
+            particles.forEach(particle => {
+                const alpha = particle.life / particle.maxLife;
+                ctx.fillStyle = `${particle.color}${Math.floor(alpha * 255).toString(16).padStart(2, '0')}`;
+                ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
+            });
+        }
+        
+        // 遊戲主循環
+        function gameLoop(currentTime) {
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            update(deltaTime);
+            draw();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // 開始遊戲
+        function startGame() {
+            gameState = 'playing';
+            score = 0;
+            level = 1;
+            health = 100;
+            maxHealth = 100;
+            player.x = 375;
+            player.y = 500;
+            player.powerLevel = 1;
+            player.fireRate = 200;
+            bullets = [];
+            enemies = [];
+            powerups = [];
+            particles = [];
+            
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOver').style.display = 'none';
+            updatePowerupIndicator();
+        }
+        
+        // 重新開始遊戲
+        function restartGame() {
+            startGame();
+        }
+        
+        // 初始化
+        initStars();
+        updatePowerupIndicator();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
