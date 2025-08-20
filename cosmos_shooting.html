@@ -953,12 +953,21 @@
                 ctx.fillStyle = enemy.color;
                 ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
                 
-                // 繪製生命值條
+                // 繪製生命值條在敵人左側
                 const healthPercent = enemy.health / enemy.maxHealth;
+                const healthBarX = enemy.x - 7; // 敵人左側間隔7px，血量條寬度5px
+                const healthBarY = enemy.y;
+                const healthBarWidth = 5;
+                const healthBarHeight = enemy.height; // 高度等於敵人高度
+                
+                // 背景血量條（紅色）
                 ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
-                ctx.fillRect(enemy.x, enemy.y - 8, enemy.width, 4);
+                ctx.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+                
+                // 當前血量條（綠色）
                 ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
-                ctx.fillRect(enemy.x, enemy.y - 8, enemy.width * healthPercent, 4);
+                ctx.fillRect(healthBarX, healthBarY + healthBarHeight * (1 - healthPercent), 
+                           healthBarWidth, healthBarHeight * healthPercent);
             });
             
             // 繪製道具
