@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>宇宙射擊遊戲</title>
+    <title>宇宙打亂鬥</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background: #000;
+            background: #000000;
             color: #fff;
             font-family: 'Arial', sans-serif;
             overflow: hidden;
@@ -69,7 +69,7 @@
         }
         
         button {
-            background: linear-gradient(45deg, #00ffff, #0088ff);
+            background: linear-gradient(45deg, #05f900, #00d5ff);
             border: none;
             color: #000;
             padding: 15px 30px;
@@ -114,7 +114,7 @@
         <div id="powerup-indicator" class="powerup-indicator"></div>
         
         <div id="startScreen">
-            <h1 style="color: #00ffff; margin-bottom: 30px; text-shadow: 0 0 20px #00ffff;">🚀 宇宙射擊遊戲 🚀</h1>
+            <h1 style="color: #0004ff; margin-bottom: 30px; text-shadow: 0 0 20px #002aff;">🚀 宇宙大亂鬥 🚀</h1>
             <button onclick="startGame()">開始遊戲</button>
             <div class="controls">
                 <p>操作說明：</p>
@@ -274,22 +274,22 @@
             const intensity = level - 25;
             
             switch (weaponType) {
-                case 0: // 激光陣列 (26-33等)
+                case 0: // 水藍機光(26-33等)
                     for (let i = 0; i < 8 + intensity; i++) {
                         const angle = (i * Math.PI / (4 + intensity)) - Math.PI/2;
-                        createBullet(centerX, centerY, Math.sin(angle), '#ff0066', 2 + Math.floor(level / 8), 'laser');
+                        createBullet(centerX, centerY, Math.sin(angle), '#000598', 2 + Math.floor(level / 8), 'laser');
                     }
                     break;
-                case 1: // 電漿炮 (34-41等)
+                case 1: // 光輝機關槍 (34-41等)
                     for (let i = 0; i < 6; i++) {
                         const radius = 30 + Math.sin(time + i) * 15;
                         const angle = (i * Math.PI / 3) + time;
                         const x = centerX + Math.cos(angle) * radius;
                         const y = centerY + Math.sin(angle) * 10;
-                        createBullet(x, y, 0, '#6600ff', 2 + Math.floor(level / 7), 'plasma');
+                        createBullet(x, y, 0, '#00ff37', 2 + Math.floor(level / 7), 'plasma');
                     }
                     break;
-                case 2: // 能量風暴 (42-50等)
+                case 2: // 宇宙風暴 (42-50等)
                     for (let i = 0; i < 12 + intensity; i++) {
                         const angle = (i * Math.PI / 6) + time;
                         const distance = 20 + Math.sin(time * 2 + i) * 25;
@@ -304,7 +304,7 @@
             const spellType = Math.floor((level - 51) / 8);
             
             switch (spellType) {
-                case 0: // 星爆術 (51-58等)
+                case 0: // 喚星術 (51-58等)
                     for (let i = 0; i < 16; i++) {
                         const angle = (i * Math.PI / 8) + time;
                         const distance = 15 + Math.sin(time * 3 + i) * 20;
@@ -347,7 +347,7 @@
                         createBullet(centerX + Math.cos(angle) * distance, centerY, 0, '#000033', 10 + Math.floor(level / 2), 'blackhole');
                     }
                     break;
-                case 2: // 宇宙射線 (92-99等) - 簡化
+                case 2: // 彩虹射線 (92-99等) - 簡化
                     for (let i = 0; i < 12; i++) { // 從50減少到12
                         const angle = (i - 5.5) * 0.2;
                         const hue = (time * 100 + i * 30) % 360;
@@ -399,7 +399,7 @@
         
         // 生成敵人
         function spawnEnemy() {
-            const types = ['basic', 'fast', 'heavy'];
+            const types = ['basic', 'fast', 'heavy','Thornspine'];
             const type = types[Math.floor(Math.random() * types.length)];
             
             let enemy = {
@@ -412,18 +412,18 @@
                 case 'basic':
                     enemy.width = 40;
                     enemy.height = 40;
-                    enemy.speed = 2 + level * 0.5;
-                    enemy.health = 1; // 紅色怪物改為1下死，降低難度
-                    enemy.maxHealth = 1;
+                    enemy.speed = 2 + level * 0.1;
+                    enemy.health = 4; // 紅色怪物改為4下死，提高難度
+                    enemy.maxHealth = 4;
                     enemy.color = '#ff4444';
                     enemy.points = 100;
                     break;
                 case 'fast':
                     enemy.width = 30;
                     enemy.height = 30;
-                    enemy.speed = 4 + level * 0.7;
-                    enemy.health = 1; // 綠色怪物保持1下死
-                    enemy.maxHealth = 1;
+                    enemy.speed = 4 + level * 0.2;
+                    enemy.health = 10; // 綠色怪物改為10下死，提高難度
+                    enemy.maxHealth = 10;
                     enemy.color = '#44ff44';
                     enemy.points = 150;
                     break;
@@ -431,9 +431,18 @@
                     enemy.width = 60;
                     enemy.height = 60;
                     enemy.speed = 1 + level * 0.3;
-                    enemy.health = 2; // 藍色怪物從5下死改為2下死
-                    enemy.maxHealth = 2;
+                    enemy.health = 15; // 藍色怪物從2下死改為15下死
+                    enemy.maxHealth = 15;
                     enemy.color = '#4444ff';
+                    enemy.points = 300;
+                    break;
+                case 'Thornspine':
+                    enemy.width = 100;
+                    enemy.height = 100;
+                    enemy.speed = 1 + level * 0.5;
+                    enemy.health = 20; // 白怪物20下死
+                    enemy.maxHealth = 20;
+                    enemy.color = '#fff';
                     enemy.points = 300;
                     break;
             }
@@ -443,7 +452,7 @@
         
         // 生成道具
         function spawnPowerup(x, y) {
-            if (Math.random() < 0.6) { // 增加道具掉落機率從40%到60%
+            if (Math.random() < 0.4) { // 增加道具掉落機率從60%到40%
                 const types = ['health', 'maxhealth']; // 只保留補血和增加血量上限
                 const weights = [0.7, 0.3]; // 補血70%機率，增加血量上限30%機率
                 
@@ -591,7 +600,7 @@
                     player.y < enemy.y + enemy.height &&
                     player.y + player.height > enemy.y) {
                     
-                    health -= 15; // 降低傷害從25到15
+                    health -= 30; // 降低傷害從15到30
                     createParticles(player.x + player.width/2, player.y + player.height/2, '#ff0000', 5);
                     enemies.splice(enemyIndex, 1);
                     
@@ -616,12 +625,12 @@
                             health = Math.min(maxHealth, health + 25);
                             break;
                         case 'maxhealth':
-                            maxHealth += 25; // 增加最大血量
+                            maxHealth += 20; // 增加最大血量
                             health = Math.min(maxHealth, health + 15); // 同時回復一些血量
                             break;
                     }
                     
-                    createParticles(powerup.x + powerup.width/2, powerup.y + powerup.height/2, '#00ff00', 5);
+                    createParticles(powerup.x + powerup.width/2, powerup.y + powerup.height/2, '#00c3f4', 5);
                     powerups.splice(powerupIndex, 1);
                 }
             });
@@ -638,7 +647,7 @@
                 player.powerLevel = level; // 讓玩家武器等級跟著遊戲等級提升
                 health = Math.min(maxHealth, health + 30); // 升級回血增加到30
                 // 每5級提升射速
-                if (level % 5 === 0) {
+                if (level % 10 === 0) {
                     player.fireRate = Math.max(50, player.fireRate - 20); // 提升射速
                 }
                 updatePowerupIndicator(); // 更新武器顯示
@@ -661,15 +670,15 @@
                 const typeIndex = Math.floor((player.powerLevel - 11) / 5);
                 weaponType = elementTypes[typeIndex] || '元素武器';
             } else if (player.powerLevel <= 50) {
-                const energyTypes = ['激光陣列', '電漿炮', '能量風暴'];
+                const energyTypes = ['水藍機光', '光輝機關槍', '宇宙風暴'];
                 const typeIndex = Math.floor((player.powerLevel - 26) / 8);
                 weaponType = energyTypes[typeIndex] || '能量武器';
             } else if (player.powerLevel <= 75) {
-                const magicTypes = ['星爆術', '時空扭曲', '彗星雨'];
+                const magicTypes = ['喚星術', '時空主軸 ', '彗星雨'];
                 const typeIndex = Math.floor((player.powerLevel - 51) / 8);
                 weaponType = magicTypes[typeIndex] || '魔法武器';
             } else if (player.powerLevel <= 99) {
-                const legendaryTypes = ['龍息砲', '黑洞砲', '宇宙射線'];
+                const legendaryTypes = ['彩虹射線'];
                 const typeIndex = Math.floor((player.powerLevel - 76) / 8);
                 weaponType = legendaryTypes[typeIndex] || '傳說武器';
             } else if (player.powerLevel === 100) {
