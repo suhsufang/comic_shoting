@@ -11,7 +11,6 @@
             background: #000000;
             color: #fff;
             font-family: 'Arial', sans-serif;
-            overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -119,6 +118,21 @@
             border: 2px solid #ff00ff;
             box-shadow: 0 0 15px #8800ff;
         }
+        
+        .difficulty-btn.street-fighter {
+            background: linear-gradient(45deg, #ff0000, #800000);
+            border: 2px solid #ff6600;
+            box-shadow: 0 0 20px #ff0000;
+            color: #ffffff;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
 
         .weapon-item {
             background: rgba(0, 50, 100, 0.7);
@@ -217,19 +231,22 @@
             <div>生命值: <span id="health">100/100</span></div>
             <div>分數: <span id="score">0</span></div>
             <div>等級: <span id="level">1</span></div>
+            <div>大招: <span id="ultimateStatus">準備就緒</span> (X鍵)</div>
+            <div id="bossTimer" style="display: none;">剩餘時間: <span id="remainingTime">05:00</span></div>
         </div>
         
         <div id="powerup-indicator" class="powerup-indicator"></div>
         <div class="credits-display">金幣: <span id="credits">0</span></div>
         
         <div id="mainMenu">
-            <h1 style="color: #0004ff; margin-bottom: 30px; text-shadow: 0 0 20px #002aff;">🚀 宇宙大亂鬥 🚀</h1>
+            <h1 style="color: #0004ff; margin-bottom: 30px; text-shadow: 0 0 20px #002aff;">宇宙大亂鬥</h1>
             <div style="margin: 30px 0;">
                 <h2 style="color: #00ffff;">選擇難度</h2>
                 <button class="difficulty-btn" onclick="selectDifficulty('easy')">簡單</button>
                 <button class="difficulty-btn medium" onclick="selectDifficulty('medium')">普通</button>
                 <button class="difficulty-btn hard" onclick="selectDifficulty('hard')">困難</button>
-                <button class="difficulty-btn boss" onclick="selectDifficulty('boss')">🔥 魔王挑戰 🔥</button>
+                <button class="difficulty-btn boss" onclick="selectDifficulty('boss')">魔王挑戰</button>
+                <button class="difficulty-btn street-fighter" onclick="selectDifficulty('street_fighter')">快打旋風</button>
             </div>
             <div style="margin: 30px 0;">
                 <button onclick="openWeaponShop()">武器商店</button>
@@ -269,9 +286,13 @@
             <div style="margin-bottom: 20px;">
                 <button onclick="showWeapons()" id="weaponTab" class="shop-tab active">武器</button>
                 <button onclick="showBullets()" id="bulletTab" class="shop-tab">子彈</button>
+                <button onclick="showArmors()" id="armorTab" class="shop-tab">盔甲</button>
+                <button onclick="showUltimates()" id="ultimateTab" class="shop-tab">大絕招</button>
             </div>
             <div id="weaponList"></div>
             <div id="bulletList" style="display: none;"></div>
+            <div id="armorList" style="display: none;"></div>
+            <div id="ultimateList" style="display: none;"></div>
             <button onclick="backToMainMenu()" style="margin-top: 20px;">返回主選單</button>
         </div>
         
@@ -302,6 +323,12 @@
         
         // 難度設定
         let difficulty = 'easy';
+        
+        // 魔王挑戰模式計時器
+        let bossTimerStart = 0;
+        let bossTimeLimit = 5 * 60 * 1000; // 5分鐘 (毫秒)
+        let streetFighterTimeLimit = 3 * 60 * 1000; // 3分鐘 (毫秒)
+        
         let difficultySettings = {
             easy: {
                 enemySpeedMultiplier: 1,
@@ -330,6 +357,13 @@
                 enemySpawnRate: 0,
                 playerDamageMultiplier: 0.7,
                 creditMultiplier: 10.0
+            },
+            street_fighter: {
+                enemySpeedMultiplier: 3.0,
+                enemyHealthMultiplier: 4.0,
+                enemySpawnRate: 0,
+                playerDamageMultiplier: 0.5,
+                creditMultiplier: 20.0
             }
         };
         
@@ -338,6 +372,14 @@
         let equippedWeapon = 'basic';
         let ownedBullets = ['normal'];
         let equippedBullet = 'normal';
+        
+        // 盔甲系統
+        let ownedArmors = ['none', 'light', 'medium', 'heavy'];
+        let equippedArmor = 'none';
+        
+        // 大絕招系統
+        let ownedUltimates = ['shield', 'laser_storm', 'divine_wrath', 'black_hole', 'void_storm', 'dimensional_rift', 'cosmos_annihilation', 'quantum_field'];
+        let equippedUltimate = 'divine_wrath';
         
         let weapons = {
             basic: {
@@ -354,7 +396,7 @@
                 damage: 2.0,
                 fireRate: 80,
                 description: '超高射速攻擊',
-                minLevel: 5
+                minLevel: 1
             },
             heavy: {
                 name: '重型砲台',
@@ -362,7 +404,7 @@
                 damage: 4.0,
                 fireRate: 300,
                 description: '超高傷害重砲',
-                minLevel: 10
+                minLevel: 1
             },
             spread: {
                 name: '散射炮',
@@ -370,7 +412,7 @@
                 damage: 2.8,
                 fireRate: 200,
                 description: '3發高傷散射攻擊',
-                minLevel: 12
+                minLevel: 1
             },
             piercing: {
                 name: '穿透槍',
@@ -378,7 +420,7 @@
                 damage: 3.5,
                 fireRate: 140,
                 description: '高傷穿透攻擊',
-                minLevel: 18
+                minLevel: 1
             },
             elemental: {
                 name: '元素之力',
@@ -386,7 +428,7 @@
                 damage: 3.2,
                 fireRate: 120,
                 description: '雙發元素攻擊',
-                minLevel: 20
+                minLevel: 1
             },
             sniper: {
                 name: '宇宙狙擊槍',
@@ -394,7 +436,7 @@
                 damage: 8.0,
                 fireRate: 800,
                 description: '極高傷害精準攻擊',
-                minLevel: 25
+                minLevel: 1
             },
             minigun: {
                 name: '旋轉機砲',
@@ -402,7 +444,7 @@
                 damage: 2.2,
                 fireRate: 40,
                 description: '極速連續攻擊',
-                minLevel: 30
+                minLevel: 1
             },
             fusion: {
                 name: '核融合砲',
@@ -410,7 +452,7 @@
                 damage: 6.0,
                 fireRate: 180,
                 description: '核能融合爆炸',
-                minLevel: 35
+                minLevel: 1
             },
             antimatter: {
                 name: '反物質射線',
@@ -418,7 +460,7 @@
                 damage: 12.0,
                 fireRate: 600,
                 description: '最高科技武器',
-                minLevel: 40
+                minLevel: 1
             },
             quantum: {
                 name: '量子破壞者',
@@ -426,15 +468,63 @@
                 damage: 15.0,
                 fireRate: 400,
                 description: '量子空間武器',
-                minLevel: 45
+                minLevel: 1
+            },
+            laser: {
+                name: '激光劍',
+                price: 30000,
+                damage: 12.0,
+                fireRate: 180,
+                description: '高能激光連射',
+                minLevel: 1
+            },
+            plasma: {
+                name: '等離子炮',
+                price: 45000,
+                damage: 15.0,
+                fireRate: 220,
+                description: '爆炸性等離子攻擊',
+                minLevel: 1
+            },
+            railgun: {
+                name: '軌道炮',
+                price: 65000,
+                damage: 25.0,
+                fireRate: 400,
+                description: '瞬間穿透一切敵人',
+                minLevel: 1
+            },
+            gatling: {
+                name: '加特林機炮',
+                price: 80000,
+                damage: 4.0,
+                fireRate: 40,
+                description: '超高射速彈幕攻擊',
+                minLevel: 1
+            },
+            quantum: {
+                name: '量子分解器',
+                price: 120000,
+                damage: 20.0,
+                fireRate: 160,
+                description: '分子級別的毀滅武器',
+                minLevel: 1
+            },
+            chaos: {
+                name: '混沌之源',
+                price: 200000,
+                damage: 35.0,
+                fireRate: 200,
+                description: '傳說級混沌力量',
+                minLevel: 1
             },
             cosmic: {
                 name: '宇宙毀滅者',
                 price: 500000,
-                damage: 20.0,
+                damage: 100.0,
                 fireRate: 300,
                 description: '終極宇宙武器',
-                minLevel: 50
+                minLevel: 1
             }
         };
         
@@ -457,7 +547,7 @@
                 color: '#ff4400',
                 effect: 'explosive',
                 description: '擊中時產生爆炸',
-                minLevel: 6
+                minLevel: 1
             },
             ice: {
                 name: '冰凍彈',
@@ -467,7 +557,7 @@
                 color: '#00aaff',
                 effect: 'ice',
                 description: '減緩敵人速度',
-                minLevel: 10
+                minLevel: 1
             },
             lightning: {
                 name: '電漿彈',
@@ -477,7 +567,7 @@
                 color: '#ffff00',
                 effect: 'lightning',
                 description: '快速且帶電效果',
-                minLevel: 14
+                minLevel: 1
             },
             laser: {
                 name: '激光束',
@@ -487,7 +577,7 @@
                 color: '#00ff37',
                 effect: 'laser',
                 description: '高速穿透攻擊',
-                minLevel: 18
+                minLevel: 1
             },
             plasma: {
                 name: '等離子炮',
@@ -497,7 +587,7 @@
                 color: '#aa00ff',
                 effect: 'plasma',
                 description: '超高傷害等離子體',
-                minLevel: 25
+                minLevel: 1
             },
             neutron: {
                 name: '中子星彈',
@@ -507,7 +597,7 @@
                 color: '#ff0080',
                 effect: 'neutron',
                 description: '極重中子星物質',
-                minLevel: 30
+                minLevel: 1
             },
             antimatter: {
                 name: '反物質彈',
@@ -517,7 +607,7 @@
                 color: '#8000ff',
                 effect: 'antimatter',
                 description: '反物質湍滅彈藥',
-                minLevel: 35
+                minLevel: 1
             },
             quantum: {
                 name: '量子彈',
@@ -527,7 +617,7 @@
                 color: '#00ffff',
                 effect: 'quantum',
                 description: '量子空間破壞',
-                minLevel: 40
+                minLevel: 1
             },
             singularity: {
                 name: '黑洞彈',
@@ -537,7 +627,7 @@
                 color: '#4d0080',
                 effect: 'singularity',
                 description: '微型黑洞吸取彈',
-                minLevel: 45
+                minLevel: 1
             },
             genesis: {
                 name: '創世之彈',
@@ -547,7 +637,273 @@
                 color: '#ffffff',
                 effect: 'genesis',
                 description: '終極創世力量',
-                minLevel: 50
+                minLevel: 1
+            },
+            void: {
+                name: '虛空彈',
+                price: 300000,
+                damageMultiplier: 8.0,
+                speed: 18,
+                color: '#000080',
+                effect: 'void',
+                description: '虛空吞噬一切',
+                minLevel: 1
+            },
+            time: {
+                name: '時間彈',
+                price: 800000,
+                damageMultiplier: 12.0,
+                speed: 25,
+                color: '#ffaa00',
+                effect: 'time',
+                description: '時間扭曲攻擊',
+                minLevel: 1
+            },
+            reality: {
+                name: '現實彈',
+                price: 1200000,
+                damageMultiplier: 15.0,
+                speed: 22,
+                color: '#ff0040',
+                effect: 'reality',
+                description: '扭曲現實的力量',
+                minLevel: 1
+            },
+            infinity: {
+                name: '無限彈',
+                price: 2000000,
+                damageMultiplier: 20.0,
+                speed: 30,
+                color: '#rainbow',
+                effect: 'infinity',
+                description: '無限宇宙的力量',
+                minLevel: 1
+            },
+            godkiller: {
+                name: '弒神彈',
+                price: 5000000,
+                damageMultiplier: 50.0,
+                speed: 35,
+                color: '#ff0000',
+                effect: 'godkiller',
+                description: '弒殺神靈的終極彈藥',
+                minLevel: 1
+            }
+        };
+        
+        // 盔甲系統定義
+        let armorTypes = {
+            none: {
+                name: '無裝備',
+                price: 0,
+                speedBoost: 0,
+                healthBoost: 0,
+                description: '沒有裝備盔甲',
+                minLevel: 1
+            },
+            light: {
+                name: '輕型盔甲',
+                price: 1500,
+                speedBoost: 1,
+                healthBoost: 20,
+                description: '輕量化設計，提升速度和少量血量',
+                minLevel: 1
+            },
+            medium: {
+                name: '中型盔甲',
+                price: 3500,
+                speedBoost: 0.5,
+                healthBoost: 50,
+                description: '平衡的防護，適度提升生存能力',
+                minLevel: 1
+            },
+            heavy: {
+                name: '重型盔甲',
+                price: 7000,
+                speedBoost: -0.5,
+                healthBoost: 100,
+                description: '厚重防護，大幅提升血量但略減速度',
+                minLevel: 1
+            },
+            nano: {
+                name: '奈米盔甲',
+                price: 12000,
+                speedBoost: 2,
+                healthBoost: 80,
+                description: '高科技材質，同時提升速度和血量',
+                minLevel: 1
+            },
+            quantum: {
+                name: '量子盔甲',
+                price: 25000,
+                speedBoost: 3,
+                healthBoost: 150,
+                description: '量子防護技術',
+                minLevel: 1
+            },
+            plasma: {
+                name: '等離子盔甲',
+                price: 45000,
+                speedBoost: 2,
+                healthBoost: 200,
+                description: '等離子能量護盾',
+                minLevel: 1
+            },
+            void: {
+                name: '虛空盔甲',
+                price: 80000,
+                speedBoost: 4,
+                healthBoost: 250,
+                description: '虛空能量保護',
+                minLevel: 1
+            },
+            dimension: {
+                name: '次元盔甲',
+                price: 150000,
+                speedBoost: 5,
+                healthBoost: 300,
+                description: '次元空間防護',
+                minLevel: 1
+            },
+            cosmic: {
+                name: '宇宙盔甲',
+                price: 300000,
+                speedBoost: 6,
+                healthBoost: 500,
+                description: '宇宙級防護系統',
+                minLevel: 1
+            },
+            infinity: {
+                name: '無限盔甲',
+                price: 1000000,
+                speedBoost: 10,
+                healthBoost: 1000,
+                description: '無限宇宙的終極防護',
+                minLevel: 1
+            },
+            godslayer: {
+                name: '弒神盔甲',
+                price: 5000000,
+                speedBoost: 15,
+                healthBoost: 2000,
+                description: '弒殺神靈的傳說盔甲',
+                minLevel: 1
+            }
+        };
+        
+        // 大絕招系統定義
+        let ultimateTypes = {
+            shield: {
+                name: '護盾增強',
+                price: 0,
+                cooldown: 15000,
+                duration: 5000,
+                description: '短時間內免疫傷害',
+                minLevel: 1
+            },
+            laser_storm: {
+                name: '激光風暴',
+                price: 8000,
+                cooldown: 35000,
+                duration: 3000,
+                description: '發射大量激光橫掃敵人',
+                minLevel: 1
+            },
+            time_slow: {
+                name: '時間減緩',
+                price: 5000,
+                cooldown: 25000,
+                duration: 4000,
+                description: '減慢敵人移動和攻擊速度',
+                minLevel: 1
+            },
+            nuclear_blast: {
+                name: '核爆清場',
+                price: 8000,
+                cooldown: 30000,
+                duration: 1000,
+                description: '瞬間清除所有敵人',
+                minLevel: 1
+            },
+            phoenix: {
+                name: '鳳凰重生',
+                price: 15000,
+                cooldown: 45000,
+                duration: 8000,
+                description: '死亡時自動復活並獲得無敵時間',
+                minLevel: 1
+            },
+            berserker_rage: {
+                name: '狂戰士怒吼',
+                price: 25000,
+                cooldown: 35000,
+                duration: 6000,
+                description: '大幅提升攻擊力和射擊速度',
+                minLevel: 1
+            },
+            black_hole: {
+                name: '黑洞吸收',
+                price: 40000,
+                cooldown: 50000,
+                duration: 5000,
+                description: '吸引敵人並造成持續傷害',
+                minLevel: 1
+            },
+            dimensional_rift: {
+                name: '次元裂縫',
+                price: 60000,
+                cooldown: 40000,
+                duration: 4000,
+                description: '瞬移並在原位置留下爆炸',
+                minLevel: 1
+            },
+            elemental_fury: {
+                name: '元素狂怒',
+                price: 80000,
+                cooldown: 45000,
+                duration: 7000,
+                description: '發射火焰、冰霜、雷電三種元素攻擊',
+                minLevel: 1
+            },
+            void_storm: {
+                name: '虛空風暴',
+                price: 120000,
+                cooldown: 60000,
+                duration: 8000,
+                description: '召喚虛空能量環繞玩家',
+                minLevel: 1
+            },
+            quantum_field: {
+                name: '量子力場',
+                price: 200000,
+                cooldown: 70000,
+                duration: 10000,
+                description: '反射所有敵人子彈回去攻擊它們',
+                minLevel: 1
+            },
+            divine_wrath: {
+                name: '神聖制裁',
+                price: 350000,
+                cooldown: 80000,
+                duration: 12000,
+                description: '召喚天雷轟擊所有敵人',
+                minLevel: 1
+            },
+            reality_break: {
+                name: '現實破碎',
+                price: 500000,
+                cooldown: 90000,
+                duration: 6000,
+                description: '短時間內無視一切物理法則',
+                minLevel: 1
+            },
+            cosmos_annihilation: {
+                name: '宇宙湮滅',
+                price: 1000000,
+                cooldown: 120000,
+                duration: 15000,
+                description: '終極大絕招，毀滅一切',
+                minLevel: 1
             }
         };
         
@@ -562,6 +918,48 @@
             lastFire: 0,
             powerLevel: 1
         };
+        
+        
+        // 應用盔甲效果的函數
+        function applyArmorEffects() {
+            const currentArmor = armorTypes[equippedArmor] || armorTypes['none'];
+
+            // 保存舊的最大血量
+            const oldMaxHealth = maxHealth;
+
+            // 重置玩家基礎數值
+            player.baseSpeed = player.baseSpeed || 5;
+            player.baseMaxHealth = player.baseMaxHealth || 100;
+
+            // 應用盔甲效果
+            player.speed = player.baseSpeed + currentArmor.speedBoost;
+            player.maxHealth = player.baseMaxHealth + currentArmor.healthBoost;
+            maxHealth = player.maxHealth;
+
+            // 確保速度不會太低
+            if (player.speed < 1) player.speed = 1;
+
+            // 如果最大血量增加了，也增加當前血量
+            const healthIncrease = maxHealth - oldMaxHealth;
+            if (healthIncrease > 0) {
+                health += healthIncrease;
+            }
+
+            // 如果當前血量超過新的最大血量，調整血量
+            if (health > maxHealth) {
+                health = maxHealth;
+            }
+
+            // 確保血量不會低於1
+            if (health < 1) health = 1;
+        }
+        
+        // 大絕招狀態變數
+        let ultimateActive = false;
+        let ultimateType = null;
+        let ultimateStartTime = 0;
+        let ultimateDuration = 0;
+        let ultimateCooldownEnd = 0;
         
         // 遊戲物件陣列
         let bullets = [];
@@ -590,6 +988,10 @@
         document.addEventListener('keydown', (e) => {
             keys[e.code] = true;
             if (e.code === 'Space') {
+                e.preventDefault();
+            }
+            if (e.code === 'KeyX' && gameState === 'playing') {
+                useUltimate();
                 e.preventDefault();
             }
         });
@@ -635,7 +1037,7 @@
                     createBullet(centerX - 2, centerY, 0, currentBullet.color, 1, 'piercing');
                     break;
                 case 'elemental':
-                    const time = Date.now() * 0.01;
+                    const elementalTime = Date.now() * 0.01;
                     for (let i = 0; i < 2; i++) {
                         const angle = (i - 0.5) * 0.2;
                         createBullet(centerX - 2 + (i - 0.5) * 15, centerY, angle, currentBullet.color, 1, currentBullet.effect);
@@ -809,7 +1211,8 @@
                 'easy': '簡單',
                 'medium': '普通', 
                 'hard': '困難',
-                'boss': '🔥 魔王之戰 🔥'
+                'boss': '魔王挑戰',
+                'street_fighter': '快打旋風 '
             };
             document.getElementById('selectedDifficulty').textContent = difficultyNames[diff];
             showStartScreen();
@@ -847,19 +1250,67 @@
         }
 
         function showWeapons() {
+            // 移除所有活動狀態
             document.getElementById('weaponTab').classList.add('active');
             document.getElementById('bulletTab').classList.remove('active');
+            document.getElementById('armorTab').classList.remove('active');
+            document.getElementById('ultimateTab').classList.remove('active');
+            
+            // 隱藏所有列表
             document.getElementById('weaponList').style.display = 'block';
             document.getElementById('bulletList').style.display = 'none';
+            document.getElementById('armorList').style.display = 'none';
+            document.getElementById('ultimateList').style.display = 'none';
+            
             updateWeaponShop();
         }
 
         function showBullets() {
+            // 移除所有活動狀態
             document.getElementById('weaponTab').classList.remove('active');
             document.getElementById('bulletTab').classList.add('active');
+            document.getElementById('armorTab').classList.remove('active');
+            document.getElementById('ultimateTab').classList.remove('active');
+            
+            // 隱藏所有列表
             document.getElementById('weaponList').style.display = 'none';
             document.getElementById('bulletList').style.display = 'block';
+            document.getElementById('armorList').style.display = 'none';
+            document.getElementById('ultimateList').style.display = 'none';
+            
             updateBulletShop();
+        }
+
+        function showArmors() {
+            // 移除所有活動狀態
+            document.getElementById('weaponTab').classList.remove('active');
+            document.getElementById('bulletTab').classList.remove('active');
+            document.getElementById('armorTab').classList.add('active');
+            document.getElementById('ultimateTab').classList.remove('active');
+            
+            // 隱藏所有列表
+            document.getElementById('weaponList').style.display = 'none';
+            document.getElementById('bulletList').style.display = 'none';
+            document.getElementById('armorList').style.display = 'block';
+            document.getElementById('ultimateList').style.display = 'none';
+            
+            updateArmorShop();
+        }
+
+        function showUltimates() {
+            // 移除所有活動狀態
+            document.getElementById('weaponTab').classList.remove('active');
+            document.getElementById('bulletTab').classList.remove('active');
+            document.getElementById('armorTab').classList.remove('active');
+            document.getElementById('ultimateTab').classList.add('active');
+            
+            // 隱藏所有列表
+            document.getElementById('weaponList').style.display = 'none';
+            document.getElementById('bulletList').style.display = 'none';
+            document.getElementById('armorList').style.display = 'none';
+            document.getElementById('ultimateList').style.display = 'block';
+            
+            updateUltimateShop();
         }
 
         function updateWeaponShop() {
@@ -890,12 +1341,12 @@
                 } else if (isOwned) {
                     buttonText = '裝備';
                     buttonAction = `onclick="equipWeapon('${weaponId}')"`;
-                } else if (canBuy) {
-                    buttonText = `購買 (${weapon.price}金)`;
-                    buttonAction = `onclick="buyWeapon('${weaponId}')"`;
                 } else if (level < weapon.minLevel) {
                     buttonText = `需要等級${weapon.minLevel}`;
                     buttonAction = '';
+                } else if (credits >= weapon.price) {
+                    buttonText = `購買 (${weapon.price}金)`;
+                    buttonAction = `onclick="buyWeapon('${weaponId}')"`;
                 } else {
                     buttonText = `金幣不足 (${weapon.price}金)`;
                     buttonAction = '';
@@ -907,7 +1358,6 @@
                     <div class="weapon-stats">
                         <p>傷害: ${weapon.damage}x</p>
                         <p>射速: ${(1000/weapon.fireRate).toFixed(1)}/秒</p>
-                        <p>需求等級: ${weapon.minLevel}</p>
                     </div>
                     <div class="weapon-price">${weapon.price === 0 ? '免費' : weapon.price + '金幣'}</div>
                     <button ${buttonAction} ${!buttonAction ? 'disabled' : ''}>${buttonText}</button>
@@ -942,12 +1392,12 @@
                 } else if (isOwned) {
                     buttonText = '裝備';
                     buttonAction = `onclick="equipBullet('${bulletId}')"`;
-                } else if (canBuy) {
-                    buttonText = `購買 (${bullet.price}金)`;
-                    buttonAction = `onclick="buyBullet('${bulletId}')"`;
                 } else if (level < bullet.minLevel) {
                     buttonText = `需要等級${bullet.minLevel}`;
                     buttonAction = '';
+                } else if (credits >= bullet.price) {
+                    buttonText = `購買 (${bullet.price}金)`;
+                    buttonAction = `onclick="buyBullet('${bulletId}')"`;
                 } else {
                     buttonText = `金幣不足 (${bullet.price}金)`;
                     buttonAction = '';
@@ -966,6 +1416,110 @@
                 `;
                 
                 bulletList.appendChild(bulletDiv);
+            });
+        }
+        
+        function updateArmorShop() {
+            const armorList = document.getElementById('armorList');
+            armorList.innerHTML = '';
+            
+            Object.keys(armorTypes).forEach(armorId => {
+                const armor = armorTypes[armorId];
+                const armorDiv = document.createElement('div');
+                armorDiv.className = 'weapon-item';
+                
+                const isOwned = ownedArmors.includes(armorId);
+                const isEquipped = equippedArmor === armorId;
+                const canBuy = credits >= armor.price && level >= armor.minLevel;
+                
+                if (isOwned) armorDiv.className += ' owned';
+                if (isEquipped) armorDiv.className += ' equipped';
+                
+                let buttonText = '';
+                let buttonAction = '';
+                
+                if (isEquipped) {
+                    buttonText = '✓ 已裝備';
+                    buttonAction = '';
+                } else if (isOwned) {
+                    buttonText = '裝備';
+                    buttonAction = `onclick="equipArmor('${armorId}')"`;
+                } else if (level < armor.minLevel) {
+                    buttonText = `需要等級${armor.minLevel}`;
+                    buttonAction = '';
+                } else if (credits >= armor.price) {
+                    buttonText = `購買 (${armor.price}金)`;
+                    buttonAction = `onclick="buyArmor('${armorId}')"`;
+                } else {
+                    buttonText = `金幣不足 (${armor.price}金)`;
+                    buttonAction = '';
+                }
+                
+                armorDiv.innerHTML = `
+                    <h3 style="color: #00ff88; margin-bottom: 10px;">${armor.name}</h3>
+                    <p style="color: #ffffff; margin-bottom: 10px;">${armor.description}</p>
+                    <div class="weapon-stats">
+                        <p>速度加成: ${armor.speedBoost >= 0 ? '+' : ''}${armor.speedBoost}</p>
+                        <p>血量加成: +${armor.healthBoost}</p>
+                        <p>需求等級: ${armor.minLevel}</p>
+                    </div>
+                    <div class="weapon-price">${armor.price === 0 ? '免費' : armor.price + '金幣'}</div>
+                    <button ${buttonAction} ${!buttonAction ? 'disabled' : ''}>${buttonText}</button>
+                `;
+                
+                armorList.appendChild(armorDiv);
+            });
+        }
+        
+        function updateUltimateShop() {
+            const ultimateList = document.getElementById('ultimateList');
+            ultimateList.innerHTML = '';
+            
+            Object.keys(ultimateTypes).forEach(ultimateId => {
+                const ultimate = ultimateTypes[ultimateId];
+                const ultimateDiv = document.createElement('div');
+                ultimateDiv.className = 'weapon-item';
+                
+                const isOwned = ownedUltimates.includes(ultimateId);
+                const isEquipped = equippedUltimate === ultimateId;
+                const canBuy = credits >= ultimate.price && level >= ultimate.minLevel;
+                
+                if (isOwned) ultimateDiv.className += ' owned';
+                if (isEquipped) ultimateDiv.className += ' equipped';
+                
+                let buttonText = '';
+                let buttonAction = '';
+                
+                if (isEquipped) {
+                    buttonText = '✓ 已裝備';
+                    buttonAction = '';
+                } else if (isOwned) {
+                    buttonText = '裝備';
+                    buttonAction = `onclick="equipUltimate('${ultimateId}')"`;
+                } else if (level < ultimate.minLevel) {
+                    buttonText = `需要等級${ultimate.minLevel}`;
+                    buttonAction = '';
+                } else if (credits >= ultimate.price) {
+                    buttonText = `購買 (${ultimate.price}金)`;
+                    buttonAction = `onclick="buyUltimate('${ultimateId}')"`;
+                } else {
+                    buttonText = `金幣不足 (${ultimate.price}金)`;
+                    buttonAction = '';
+                }
+                
+                ultimateDiv.innerHTML = `
+                    <h3 style="color: #ff00ff; margin-bottom: 10px;">${ultimate.name}</h3>
+                    <p style="color: #ffffff; margin-bottom: 10px;">${ultimate.description}</p>
+                    <div class="weapon-stats">
+                        <p>冷卻時間: ${ultimate.cooldown / 1000}秒</p>
+                        <p>持續時間: ${ultimate.duration / 1000}秒</p>
+                        <p>需求等級: ${ultimate.minLevel}</p>
+                    </div>
+                    <div class="weapon-price">${ultimate.price === 0 ? '免費' : ultimate.price + '金幣'}</div>
+                    <button ${buttonAction} ${!buttonAction ? 'disabled' : ''}>${buttonText}</button>
+                `;
+                
+                ultimateList.appendChild(ultimateDiv);
             });
         }
 
@@ -1011,6 +1565,655 @@
                 autoSaveGame(); // 自動保存
             }
         }
+        
+        // 盔甲相關函數
+        function buyArmor(armorId) {
+            const armor = armorTypes[armorId];
+            if (credits >= armor.price && level >= armor.minLevel) {
+                credits -= armor.price;
+                ownedArmors.push(armorId);
+                updateCreditsDisplay();
+                updateArmorShop();
+                autoSaveGame(); // 自動保存
+            }
+        }
+        
+        function equipArmor(armorId) {
+            if (ownedArmors.includes(armorId)) {
+                equippedArmor = armorId;
+                applyArmorEffects(); // 應用盔甲效果
+                updateArmorShop();
+                autoSaveGame(); // 自動保存
+            }
+        }
+        
+        // 大絕招相關函數
+        function buyUltimate(ultimateId) {
+            const ultimate = ultimateTypes[ultimateId];
+            if (credits >= ultimate.price && level >= ultimate.minLevel) {
+                credits -= ultimate.price;
+                ownedUltimates.push(ultimateId);
+                updateCreditsDisplay();
+                updateUltimateShop();
+                autoSaveGame(); // 自動保存
+            }
+        }
+        
+        function equipUltimate(ultimateId) {
+            if (ownedUltimates.includes(ultimateId)) {
+                equippedUltimate = ultimateId;
+                updateUltimateShop();
+                autoSaveGame(); // 自動保存
+            }
+        }
+        
+        // 使用大絕招
+        function useUltimate() {
+            if (ultimateActive || Date.now() < ultimateCooldownEnd) {
+                // 在畫面上顯示冷卻提示
+                if (Date.now() < ultimateCooldownEnd) {
+                    const remainingCooldown = Math.ceil((ultimateCooldownEnd - Date.now()) / 1000);
+                    console.log(`大招冷卻中，還需 ${remainingCooldown} 秒`);
+                }
+                return;
+            }
+            
+            const currentUltimate = ultimateTypes[equippedUltimate];
+            if (!currentUltimate) {
+                console.log('沒有裝備大招！');
+                return;
+            }
+            
+            console.log(`使用大招: ${currentUltimate.name}`);
+            
+            ultimateActive = true;
+            ultimateType = equippedUltimate;
+            ultimateStartTime = Date.now();
+            ultimateDuration = currentUltimate.duration;
+            ultimateCooldownEnd = Date.now() + currentUltimate.cooldown;
+            
+            // 執行大絕招效果
+            executeUltimate(equippedUltimate);
+        }
+        
+        function executeUltimate(ultimateType) {
+            switch(ultimateType) {
+                case 'shield':
+                    // 護盾效果在傷害檢測中處理
+                    break;
+                case 'laser_storm':
+                    executeLaserStorm();
+                    break;
+                case 'time_slow':
+                    executeTimeSlow();
+                    break;
+                case 'nuclear_blast':
+                    executeNuclearBlast();
+                    break;
+                case 'phoenix':
+                    executePhoenix();
+                    break;
+                case 'berserker_rage':
+                    executeBerserkerRage();
+                    break;
+                case 'black_hole':
+                    executeBlackHole();
+                    break;
+                case 'dimensional_rift':
+                    executeDimensionalRift();
+                    break;
+                case 'elemental_fury':
+                    executeElementalFury();
+                    break;
+                case 'void_storm':
+                    executeVoidStorm();
+                    break;
+                case 'quantum_field':
+                    executeQuantumField();
+                    break;
+                case 'divine_wrath':
+                    executeDivineWrath();
+                    break;
+                case 'reality_break':
+                    executeRealityBreak();
+                    break;
+                case 'cosmos_annihilation':
+                    executeCosmosAnnihilation();
+                    break;
+            }
+        }
+        
+        function executeLaserStorm() {
+            const interval = setInterval(() => {
+                if (!ultimateActive || ultimateType !== 'laser_storm') {
+                    clearInterval(interval);
+                    return;
+                }
+                
+                // 發射多道激光
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i * Math.PI / 4);
+                    const x = player.x + player.width / 2;
+                    const y = player.y + player.height / 2;
+                    createBullet(x, y, angle, '#ff00ff', 3, 'piercing');
+                }
+            }, 100);
+        }
+        
+        function executeTimeSlow() {
+            // 時間減緩效果在敵人移動更新中處理
+        }
+        
+        function executeNuclearBlast() {
+            // 清除所有敵人
+            enemies.forEach(enemy => {
+                createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, '#ff0000', 10);
+                credits += Math.floor(enemy.credits * 2); // 雙倍獎勵
+            });
+            bosses.forEach(boss => {
+                createParticles(boss.x + boss.width/2, boss.y + boss.height/2, '#ff0000', 20);
+                credits += Math.floor(boss.credits * 2);
+            });
+            enemies.length = 0;
+            bosses.length = 0;
+            bossBullets.length = 0;
+            updateCreditsDisplay();
+        }
+        
+        function executePhoenix() {
+            // 鳳凰重生效果在玩家死亡時處理
+        }
+        
+        function executeBerserkerRage() {
+            // 暫存原始數值
+            const originalFireRate = weapons[equippedWeapon].fireRate;
+            const originalDamage = weapons[equippedWeapon].damage;
+            
+            // 增強數值
+            weapons[equippedWeapon].fireRate *= 2;
+            weapons[equippedWeapon].damage *= 1.5;
+            
+            setTimeout(() => {
+                if (weapons[equippedWeapon]) {
+                    weapons[equippedWeapon].fireRate = originalFireRate;
+                    weapons[equippedWeapon].damage = originalDamage;
+                }
+            }, ultimateTypes.berserker_rage.duration);
+        }
+        
+        function executeBlackHole() {
+            const interval = setInterval(() => {
+                if (!ultimateActive || ultimateType !== 'black_hole') {
+                    clearInterval(interval);
+                    return;
+                }
+
+                const blackHoleX = player.x + player.width / 2;
+                const blackHoleY = player.y + player.height / 2;
+                const attractRadius = 200;
+
+                // 處理普通敵人
+                enemies.forEach(enemy => {
+                    const dx = blackHoleX - (enemy.x + enemy.width / 2);
+                    const dy = blackHoleY - (enemy.y + enemy.height / 2);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < attractRadius) {
+                        const force = (attractRadius - distance) / attractRadius;
+                        enemy.x += dx * force * 0.05;
+                        enemy.y += dy * force * 0.05;
+
+                        // 造成傷害
+                        if (distance < 50) {
+                            enemy.health -= 2;
+                            if (enemy.health <= 0) {
+                                enemies.splice(enemies.indexOf(enemy), 1);
+                                score += enemy.points;
+                                credits += enemy.credits;
+                                updateCreditsDisplay();
+                            }
+                        }
+                    }
+                });
+
+                // 處理BOSS
+                bosses.forEach(boss => {
+                    const dx = blackHoleX - (boss.x + boss.width / 2);
+                    const dy = blackHoleY - (boss.y + boss.height / 2);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < attractRadius) {
+                        const force = (attractRadius - distance) / attractRadius;
+                        // BOSS較重，移動速度較慢
+                        boss.x += dx * force * 0.02;
+                        boss.y += dy * force * 0.02;
+
+                        // 對BOSS造成更高傷害
+                        if (distance < 80) {
+                            // 先扣護盾（如果有的話）
+                            if (boss.shield && boss.shield > 0) {
+                                const shieldDamage = Math.min(8, boss.shield);
+                                boss.shield -= shieldDamage;
+                                const remainingDamage = 8 - shieldDamage;
+                                if (remainingDamage > 0) {
+                                    boss.health -= remainingDamage;
+                                }
+                            } else {
+                                boss.health -= 8;
+                            }
+
+                            if (boss.health <= 0) {
+                                bosses.splice(bosses.indexOf(boss), 1);
+                                score += boss.points * 2;
+                                credits += boss.credits * 2;
+                                updateCreditsDisplay();
+                            }
+                        }
+                    }
+                });
+            }, 50);
+        }
+        
+        function executeDimensionalRift() {
+            const originalX = player.x;
+            const originalY = player.y;
+            
+            // 瞬移到隨機位置
+            player.x = Math.random() * (canvas.width - player.width);
+            player.y = Math.random() * (canvas.height - player.height);
+            
+            // 在原位置創造爆炸
+            setTimeout(() => {
+                const explosionRadius = 100;
+
+                // 爆炸影響普通敵人
+                enemies.forEach((enemy, index) => {
+                    const dx = originalX - enemy.x;
+                    const dy = originalY - enemy.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < explosionRadius) {
+                        enemies.splice(index, 1);
+                        score += enemy.points * 2;
+                        credits += enemy.credits * 2;
+                        updateCreditsDisplay();
+                    }
+                });
+
+                // 爆炸影響BOSS
+                bosses.forEach((boss, index) => {
+                    const dx = originalX - boss.x;
+                    const dy = originalY - boss.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < explosionRadius) {
+                        const damage = Math.floor(boss.maxHealth * 0.25); // 造成25%最大血量傷害
+
+                        // 先扣護盾（如果有的話）
+                        if (boss.shield && boss.shield > 0) {
+                            const shieldDamage = Math.min(damage, boss.shield);
+                            boss.shield -= shieldDamage;
+                            const remainingDamage = damage - shieldDamage;
+                            if (remainingDamage > 0) {
+                                boss.health -= remainingDamage;
+                            }
+                        } else {
+                            boss.health -= damage;
+                        }
+
+                        createParticles(boss.x + boss.width/2, boss.y + boss.height/2, '#ff00ff', 20);
+
+                        if (boss.health <= 0) {
+                            bosses.splice(index, 1);
+                            score += boss.points * 3;
+                            credits += boss.credits * 3;
+                            updateCreditsDisplay();
+                        }
+                    }
+                });
+            }, 500);
+        }
+        
+        function executeElementalFury() {
+            const interval = setInterval(() => {
+                if (!ultimateActive || ultimateType !== 'elemental_fury') {
+                    clearInterval(interval);
+                    return;
+                }
+                
+                const playerCenterX = player.x + player.width / 2;
+                const playerCenterY = player.y + player.height / 2;
+                
+                // 火焰攻擊 - 紅色
+                createBullet(playerCenterX, playerCenterY, -Math.PI/2, '#ff0000', 5, 'fire');
+                
+                // 冰霜攻擊 - 藍色
+                createBullet(playerCenterX, playerCenterY, -Math.PI/2 - 0.3, '#0080ff', 4, 'ice');
+                
+                // 雷電攻擊 - 黃色
+                createBullet(playerCenterX, playerCenterY, -Math.PI/2 + 0.3, '#ffff00', 6, 'lightning');
+            }, 200);
+        }
+        
+        function executeVoidStorm() {
+            const voidParticles = [];
+            for (let i = 0; i < 8; i++) {
+                voidParticles.push({
+                    angle: (i * Math.PI / 4),
+                    distance: 80,
+                    speed: 0.1
+                });
+            }
+            
+            const interval = setInterval(() => {
+                if (!ultimateActive || ultimateType !== 'void_storm') {
+                    clearInterval(interval);
+                    return;
+                }
+                
+                voidParticles.forEach(particle => {
+                    particle.angle += particle.speed;
+                    const x = player.x + player.width / 2 + Math.cos(particle.angle) * particle.distance;
+                    const y = player.y + player.height / 2 + Math.sin(particle.angle) * particle.distance;
+                    
+                    // 檢查與敵人碰撞
+                    enemies.forEach((enemy, index) => {
+                        const dx = x - (enemy.x + enemy.width / 2);
+                        const dy = y - (enemy.y + enemy.height / 2);
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < 30) {
+                            enemy.health -= 3;
+                            if (enemy.health <= 0) {
+                                enemies.splice(index, 1);
+                                score += enemy.points;
+                                credits += enemy.credits;
+                                updateCreditsDisplay();
+                            }
+                        }
+                    });
+
+                    // 檢查與BOSS碰撞
+                    bosses.forEach((boss, index) => {
+                        const dx = x - (boss.x + boss.width / 2);
+                        const dy = y - (boss.y + boss.height / 2);
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < 50) {
+                            // 先扣護盾（如果有的話）
+                            if (boss.shield && boss.shield > 0) {
+                                const shieldDamage = Math.min(12, boss.shield);
+                                boss.shield -= shieldDamage;
+                                const remainingDamage = 12 - shieldDamage;
+                                if (remainingDamage > 0) {
+                                    boss.health -= remainingDamage;
+                                }
+                            } else {
+                                boss.health -= 12;
+                            }
+
+                            if (boss.health <= 0) {
+                                bosses.splice(index, 1);
+                                score += boss.points * 2;
+                                credits += boss.credits * 2;
+                                updateCreditsDisplay();
+                            }
+                        }
+                    });
+                });
+            }, 50);
+        }
+        
+        function executeQuantumField() {
+            // 量子力場在傷害檢測中處理反彈效果
+        }
+
+        // 輔助函數：找到最近的目標（敵人或BOSS）
+        function findNearestTarget(x, y) {
+            let nearestTarget = null;
+            let minDistance = Infinity;
+
+            // 檢查所有敵人
+            enemies.forEach(enemy => {
+                const dx = (enemy.x + enemy.width/2) - x;
+                const dy = (enemy.y + enemy.height/2) - y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestTarget = enemy;
+                }
+            });
+
+            // 檢查所有BOSS
+            bosses.forEach(boss => {
+                const dx = (boss.x + boss.width/2) - x;
+                const dy = (boss.y + boss.height/2) - y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestTarget = boss;
+                }
+            });
+
+            return nearestTarget;
+        }
+        
+        function executeDivineWrath() {
+            const interval = setInterval(() => {
+                if (!ultimateActive || ultimateType !== 'divine_wrath') {
+                    clearInterval(interval);
+                    return;
+                }
+
+                // 合併所有目標（普通敵人和BOSS）
+                let allTargets = [...enemies];
+                if (bosses.length > 0) {
+                    allTargets = allTargets.concat(bosses);
+                }
+
+                // 隨機選擇目標進行天雷轟擊
+                if (allTargets.length > 0) {
+                    const randomTarget = allTargets[Math.floor(Math.random() * allTargets.length)];
+                    const lightningX = randomTarget.x + randomTarget.width / 2;
+                    const lightningY = 0;
+
+                    // 創造閃電效果
+                    createBullet(lightningX, lightningY, Math.PI/2, '#ffffff', 10, 'divine');
+
+                    // 計算傷害（對BOSS造成更高傷害）
+                    const isBoss = bosses.includes(randomTarget);
+                    const damage = isBoss ? 50 : 15; // BOSS受到50傷害，普通敵人受到15傷害
+
+                    // 先扣護盾（如果有的話）
+                    if (randomTarget.shield && randomTarget.shield > 0) {
+                        const shieldDamage = Math.min(damage, randomTarget.shield);
+                        randomTarget.shield -= shieldDamage;
+                        const remainingDamage = damage - shieldDamage;
+                        if (remainingDamage > 0) {
+                            randomTarget.health -= remainingDamage;
+                        }
+                    } else {
+                        randomTarget.health -= damage;
+                    }
+
+                    // 檢查目標是否死亡
+                    if (randomTarget.health <= 0) {
+                        if (isBoss) {
+                            bosses.splice(bosses.indexOf(randomTarget), 1);
+                            score += randomTarget.points * 3;
+                            credits += randomTarget.credits * 3;
+                        } else {
+                            enemies.splice(enemies.indexOf(randomTarget), 1);
+                            score += randomTarget.points * 2;
+                            credits += randomTarget.credits * 2;
+                        }
+                        updateCreditsDisplay();
+                    }
+                }
+            }, 300);
+        }
+
+        
+        function executeRealityBreak() {
+            // 現實破碎期間無視碰撞和物理法則
+            player.invulnerable = true;
+            player.speed *= 3; // 加速移動
+            
+            setTimeout(() => {
+                player.invulnerable = false;
+                player.speed /= 3; // 恢復速度
+            }, ultimateTypes.reality_break.duration);
+        }
+        
+        function executeCosmosAnnihilation() {
+            const waves = 5;
+            let waveCount = 0;
+            
+            const interval = setInterval(() => {
+                if (!ultimateActive || ultimateType !== 'cosmos_annihilation' || waveCount >= waves) {
+                    clearInterval(interval);
+                    return;
+                }
+                
+                // 每波清除大部分敵人
+                for (let i = enemies.length - 1; i >= 0; i--) {
+                    if (Math.random() < 0.8) { // 80%機率清除
+                        score += enemies[i].points * 3;
+                        credits += enemies[i].credits * 3;
+                        enemies.splice(i, 1);
+                    }
+                }
+
+                // 對BOSS造成大量傷害
+                bosses.forEach(boss => {
+                    const damage = Math.floor(boss.maxHealth * 0.15); // 每波造成15%最大血量傷害
+
+                    // 先扣護盾（如果有的話）
+                    if (boss.shield && boss.shield > 0) {
+                        const shieldDamage = Math.min(damage, boss.shield);
+                        boss.shield -= shieldDamage;
+                        const remainingDamage = damage - shieldDamage;
+                        if (remainingDamage > 0) {
+                            boss.health -= remainingDamage;
+                        }
+                    } else {
+                        boss.health -= damage;
+                    }
+
+                    createParticles(boss.x + boss.width/2, boss.y + boss.height/2, '#ff00ff', 15);
+
+                    if (boss.health <= 0) {
+                        bosses.splice(bosses.indexOf(boss), 1);
+                        score += boss.points * 5;
+                        credits += boss.credits * 5;
+                    }
+                });
+                
+                // 創造宇宙能量波
+                for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+                    createBullet(
+                        player.x + player.width / 2,
+                        player.y + player.height / 2,
+                        angle,
+                        '#ff00ff',
+                        8,
+                        'cosmic'
+                    );
+                }
+                
+                waveCount++;
+                updateCreditsDisplay();
+            }, 1000);
+        }
+        
+        // 更新計時模式計時器
+        function updateBossTimer() {
+            if ((difficulty !== 'boss' && difficulty !== 'street_fighter') || bossTimerStart === 0) return;
+            if (gameState !== 'playing') return; // 遊戲不在進行中時不更新計時器
+
+            const now = Date.now();
+            const elapsed = now - bossTimerStart;
+            const remaining = Math.max(0, bossTimeLimit - elapsed);
+
+            // 更新顯示
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            let timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+            // 魔王挑戰模式顯示進度等級
+            if (difficulty === 'boss') {
+                const progressLevel = Math.floor(elapsed / 30000) + 1;
+                const bossMultiplier = 2.5 + (progressLevel - 1) * 0.8;
+                timeString += ` | 階段${progressLevel} (強度×${bossMultiplier.toFixed(1)})`;
+            }
+
+            document.getElementById('remainingTime').textContent = timeString;
+            
+            // 時間到期處理
+            if (remaining <= 0) {
+                if (difficulty === 'boss') {
+                    // 魔王挑戰時間到，玩家勝利
+                    gameState = 'victory';
+                    document.getElementById('finalScore').textContent = score;
+                    document.getElementById('finalLevel').textContent = level;
+                    document.getElementById('gameOver').querySelector('h2').textContent = '🎉 時間到！挑戰成功！ 🎉';
+                    document.getElementById('gameOver').querySelector('h2').style.color = '#00ff00';
+                    document.getElementById('gameOver').style.display = 'block';
+                    autoSaveGame();
+                } else if (difficulty === 'street_fighter') {
+                    // 快打旋風時間到，玩家失敗
+                    gameState = 'gameOver';
+                    document.getElementById('finalScore').textContent = score;
+                    document.getElementById('finalLevel').textContent = level;
+                    document.getElementById('gameOver').querySelector('h2').textContent = '💀 時間到！挑戰失敗！ 💀';
+                    document.getElementById('gameOver').querySelector('h2').style.color = '#ff0000';
+                    document.getElementById('gameOver').style.display = 'block';
+                    autoSaveGame();
+                }
+            }
+            
+            // 時間剩餘少於30秒時閃爍警告
+            if (remaining <= 30000 && Math.floor(remaining / 500) % 2 === 0) {
+                document.getElementById('remainingTime').style.color = '#ff0000';
+            } else {
+                document.getElementById('remainingTime').style.color = '#00ffff';
+            }
+        }
+        
+        // 更新大絕招狀態
+        function updateUltimateStatus() {
+            if (ultimateActive) {
+                const now = Date.now();
+                if (now - ultimateStartTime >= ultimateDuration) {
+                    ultimateActive = false;
+                    ultimateType = null;
+                }
+            }
+            
+            // 更新大招狀態顯示
+            updateUltimateDisplay();
+        }
+        
+        function updateUltimateDisplay() {
+            const ultimateStatusElement = document.getElementById('ultimateStatus');
+            if (!ultimateStatusElement) return;
+            
+            if (ultimateActive) {
+                const currentUltimate = ultimateTypes[ultimateType];
+                ultimateStatusElement.textContent = `使用中: ${currentUltimate?.name}`;
+                ultimateStatusElement.style.color = '#00ff00';
+            } else if (Date.now() < ultimateCooldownEnd) {
+                const remainingCooldown = Math.ceil((ultimateCooldownEnd - Date.now()) / 1000);
+                ultimateStatusElement.textContent = `冷卻中 (${remainingCooldown}s)`;
+                ultimateStatusElement.style.color = '#ff8800';
+            } else {
+                const currentUltimate = ultimateTypes[equippedUltimate];
+                ultimateStatusElement.textContent = `準備就緒: ${currentUltimate?.name}`;
+                ultimateStatusElement.style.color = '#00ffff';
+            }
+        }
 
         function updateCreditsDisplay() {
             document.getElementById('credits').textContent = credits;
@@ -1021,12 +2224,16 @@
         function saveGame() {
             const saveData = {
                 credits: credits,
-                level: level,
+                level: 1, // 固定保存為1，確保不影響遊戲平衡
                 maxHealth: maxHealth,
                 ownedWeapons: ownedWeapons,
                 ownedBullets: ownedBullets,
+                ownedArmors: ownedArmors,
+                ownedUltimates: ownedUltimates,
                 equippedWeapon: equippedWeapon,
                 equippedBullet: equippedBullet,
+                equippedArmor: equippedArmor,
+                equippedUltimate: equippedUltimate,
                 difficulty: difficulty,
                 saveDate: new Date().toLocaleDateString('zh-TW')
             };
@@ -1049,14 +2256,18 @@
                 
                 const data = JSON.parse(saveData);
                 
-                // 載入存檔數據
+                // 載入存檔數據（但不載入遊戲內等級）
                 credits = data.credits || 0;
-                level = Math.max(data.level || 1, 1);
+                // level 保持為 1，不從存檔載入，確保每次遊戲開始時重置
                 maxHealth = data.maxHealth || 100;
                 ownedWeapons = data.ownedWeapons || ['basic'];
                 ownedBullets = data.ownedBullets || ['normal'];
+                ownedArmors = data.ownedArmors || ['none'];
+                ownedUltimates = data.ownedUltimates || ['shield'];
                 equippedWeapon = data.equippedWeapon || 'basic';
                 equippedBullet = data.equippedBullet || 'normal';
+                equippedArmor = data.equippedArmor || 'none';
+                equippedUltimate = data.equippedUltimate || 'shield';
                 difficulty = data.difficulty || 'easy';
                 
                 // 更新UI顯示
@@ -1078,8 +2289,12 @@
                 maxHealth: maxHealth,
                 ownedWeapons: ownedWeapons,
                 ownedBullets: ownedBullets,
+                ownedArmors: ownedArmors,
+                ownedUltimates: ownedUltimates,
                 equippedWeapon: equippedWeapon,
                 equippedBullet: equippedBullet,
+                equippedArmor: equippedArmor,
+                equippedUltimate: equippedUltimate,
                 difficulty: difficulty,
                 saveDate: new Date().toLocaleDateString('zh-TW')
             };
@@ -1145,26 +2360,56 @@
         
         // Boss系統 - 擴展BOSS類型
         function spawnBoss() {
-            // 魔王挑戰模式允許多個Boss，一般模式只允許一個
-            if (difficulty !== 'boss' && bosses.length > 0) return;
-            
-            // 根據等級解鎖不同的BOSS類型
-            let availableBossTypes = ['laser', 'missile', 'shield'];
-            
-            if (level >= 5) availableBossTypes.push('teleport', 'berserker');
-            if (level >= 10) availableBossTypes.push('fortress', 'phantom');
-            if (level >= 15) availableBossTypes.push('dreadnought', 'voidlord');
-            if (level >= 20) availableBossTypes.push('omega', 'nemesis');
-            if (level >= 25) availableBossTypes.push('apocalypse', 'titan');
-            if (level >= 30) availableBossTypes.push('leviathan', 'phoenix');
-            if (level >= 35) availableBossTypes.push('emperor', 'worldeater');
-            if (level >= 40) availableBossTypes.push('cosmos', 'infinity');
+            // 魔王挑戰模式和快打旋風模式允許多個Boss，一般模式只允許一個
+            if (difficulty !== 'boss' && difficulty !== 'street_fighter' && bosses.length > 0) return;
+
+            let availableBossTypes;
+            let bossMultiplier;
+            let progressLevel = 1;
+
+            // 魔王挑戰模式 - 動態解鎖Boss類型
+            if (difficulty === 'boss') {
+                const elapsed = Date.now() - bossTimerStart;
+                progressLevel = Math.floor(elapsed / 30000) + 1; // 每30秒升級一次
+
+                // 基礎Boss類型
+                availableBossTypes = ['laser', 'missile', 'shield'];
+
+                // 隨時間動態解鎖更強Boss
+                if (progressLevel >= 2) availableBossTypes.push('teleport', 'berserker');
+                if (progressLevel >= 3) availableBossTypes.push('fortress', 'phantom');
+                if (progressLevel >= 4) availableBossTypes.push('dreadnought', 'voidlord');
+                if (progressLevel >= 5) availableBossTypes.push('omega', 'nemesis');
+                if (progressLevel >= 6) availableBossTypes.push('apocalypse', 'titan');
+                if (progressLevel >= 7) availableBossTypes.push('leviathan', 'phoenix');
+                if (progressLevel >= 8) availableBossTypes.push('emperor', 'worldeater');
+                if (progressLevel >= 9) availableBossTypes.push('cosmos', 'infinity');
+
+                // 隨時間增強的倍率系統
+                bossMultiplier = 2.5 + (progressLevel - 1) * 0.8; // 每30秒增加0.8倍強度
+            }
+            // 快打旋風模式 - 全新的超難Boss
+            else if (difficulty === 'street_fighter') {
+                availableBossTypes = ['ryu', 'chun_li', 'ken', 'akuma', 'sagat', 'vega', 'balrog', 'bison'];
+                bossMultiplier = 5.0; // 快打旋風模式Boss更強
+            } else {
+                // 原本的Boss系統
+                availableBossTypes = ['laser', 'missile', 'shield'];
+
+                if (level >= 5) availableBossTypes.push('teleport', 'berserker');
+                if (level >= 10) availableBossTypes.push('fortress', 'phantom');
+                if (level >= 15) availableBossTypes.push('dreadnought', 'voidlord');
+                if (level >= 20) availableBossTypes.push('omega', 'nemesis');
+                if (level >= 25) availableBossTypes.push('apocalypse', 'titan');
+                if (level >= 30) availableBossTypes.push('leviathan', 'phoenix');
+                if (level >= 35) availableBossTypes.push('emperor', 'worldeater');
+                if (level >= 40) availableBossTypes.push('cosmos', 'infinity');
+
+                bossMultiplier = 1;
+            }
             
             const bossType = availableBossTypes[Math.floor(Math.random() * availableBossTypes.length)];
             const dynamicDiff = getDynamicDifficulty(); // 使用動態難度
-            
-            // 魔王挑戰模式增強Boss屬性
-            const bossMultiplier = difficulty === 'boss' ? 2.5 : 1;
             
             let boss = {
                 x: Math.random() * (canvas.width - 200) + 100,
@@ -1191,7 +2436,7 @@
                     break;
                 case 'missile':
                     boss.color = '#ff4400';
-                    boss.name = '飛彈要塞';
+                    boss.name = '追中彈獸';
                     boss.fireRate = 1200;
                     break;
                 case 'shield':
@@ -1230,7 +2475,7 @@
                     break;
                 case 'phantom':
                     boss.color = '#440088';
-                    boss.name = '幻影主宗';
+                    boss.name = '幻影主軸';
                     boss.phaseTimer = 0;
                     boss.isPhased = false;
                     boss.phaseDuration = 3000;
@@ -1384,6 +2629,116 @@
                     boss.omnipresence = true;
                     boss.realityControl = true;
                     boss.fireRate = 100;
+                    break;
+                
+                // 快打旋風模式專屬Boss
+                case 'ryu':
+                    boss.color = '#ffffff';
+                    boss.name = '隆 (RYU)';
+                    boss.width = 120;
+                    boss.height = 100;
+                    boss.health *= 8;
+                    boss.maxHealth *= 8;
+                    boss.hadokenCharge = 0;
+                    boss.shoryukenReady = true;
+                    boss.fireRate = 300;
+                    boss.teleportTimer = 0;
+                    break;
+                    
+                case 'chun_li':
+                    boss.color = '#0088ff';
+                    boss.name = '春麗 (CHUN-LI)';
+                    boss.width = 110;
+                    boss.height = 95;
+                    boss.health *= 7;
+                    boss.maxHealth *= 7;
+                    boss.kikokenReady = true;
+                    boss.spinningBirdKick = false;
+                    boss.fireRate = 200;
+                    boss.speed *= 1.5;
+                    break;
+                    
+                case 'ken':
+                    boss.color = '#ffaa00';
+                    boss.name = '肯 (KEN)';
+                    boss.width = 120;
+                    boss.height = 100;
+                    boss.health *= 8;
+                    boss.maxHealth *= 8;
+                    boss.flameHadoken = true;
+                    boss.dragonPunch = true;
+                    boss.fireRate = 350;
+                    boss.rushMode = false;
+                    break;
+                    
+                case 'akuma':
+                    boss.color = '#440000';
+                    boss.name = '豪鬼 (AKUMA)';
+                    boss.width = 130;
+                    boss.height = 110;
+                    boss.health *= 12;
+                    boss.maxHealth *= 12;
+                    boss.ragingDemon = 0;
+                    boss.airFireball = true;
+                    boss.fireRate = 150;
+                    boss.teleportMaster = true;
+                    boss.darkHadoken = true;
+                    break;
+                    
+                case 'sagat':
+                    boss.color = '#ff8800';
+                    boss.name = '沙卡特 (SAGAT)';
+                    boss.width = 140;
+                    boss.height = 120;
+                    boss.health *= 10;
+                    boss.maxHealth *= 10;
+                    boss.tigerShot = true;
+                    boss.tigerUppercut = true;
+                    boss.fireRate = 400;
+                    boss.range = 600;
+                    break;
+                    
+                case 'vega':
+                    boss.color = '#8800ff';
+                    boss.name = '維加 (VEGA)';
+                    boss.width = 115;
+                    boss.height = 100;
+                    boss.health *= 6;
+                    boss.maxHealth *= 6;
+                    boss.clawAttack = true;
+                    boss.wallJump = true;
+                    boss.fireRate = 250;
+                    boss.speed *= 2;
+                    boss.agility = 5;
+                    break;
+                    
+                case 'balrog':
+                    boss.color = '#0044aa';
+                    boss.name = '巴洛克 (BALROG)';
+                    boss.width = 130;
+                    boss.height = 110;
+                    boss.health *= 11;
+                    boss.maxHealth *= 11;
+                    boss.dashPunch = true;
+                    boss.headbutt = true;
+                    boss.fireRate = 500;
+                    boss.armor = Math.ceil(50 * dynamicDiff.enemyHealthMultiplier);
+                    break;
+                    
+                case 'bison':
+                    boss.color = '#cc0000';
+                    boss.name = '拜森 (M.BISON)';
+                    boss.width = 150;
+                    boss.height = 120;
+                    boss.health *= 15;
+                    boss.maxHealth *= 15;
+                    boss.psychoPower = true;
+                    boss.scissorKick = true;
+                    boss.teleport = true;
+                    boss.fireRate = 200;
+                    boss.finalBoss = true;
+                    boss.shield = Math.ceil(100 * dynamicDiff.enemyHealthMultiplier);
+                    boss.maxShield = boss.shield;
                     break;
             }
             
@@ -1786,6 +3141,227 @@
                         }
                     }
                     break;
+                
+                // 快打旋風Boss攻擊模式
+                case 'ryu':
+                    // 隆的波動拳
+                    if (boss.hadokenCharge < 3) {
+                        createBossBullet(bossCenterX, bossCenterY + 50, Math.PI/2, '#0099ff', 'hadoken');
+                        boss.hadokenCharge++;
+                    } else {
+                        // 升龍拳 - 向上發射的多重攻擊
+                        for (let i = 0; i < 5; i++) {
+                            createBossBullet(bossCenterX + (i-2) * 10, bossCenterY, -Math.PI/2 + (i-2) * 0.2, '#ffaa00', 'shoryuken');
+                        }
+                        boss.hadokenCharge = 0;
+                    }
+                    
+                    // 瞬移攻擊
+                    if (now - boss.teleportTimer > 5000) {
+                        boss.x = Math.random() * (canvas.width - boss.width);
+                        boss.teleportTimer = now;
+                        for (let i = 0; i < 8; i++) {
+                            const angle = (i * Math.PI / 4);
+                            createBossBullet(bossCenterX, bossCenterY, angle, '#ffffff', 'energy');
+                        }
+                    }
+                    break;
+                    
+                case 'chun_li':
+                    // 春麗的氣功拳
+                    if (boss.kikokenReady) {
+                        for (let i = 0; i < 3; i++) {
+                            createBossBullet(bossCenterX + (i-1) * 20, bossCenterY + 50, Math.PI/2 + (i-1) * 0.3, '#0088ff', 'kikoken');
+                        }
+                        boss.kikokenReady = false;
+                        setTimeout(() => boss.kikokenReady = true, 2000);
+                    }
+                    
+                    // 旋風腿 - 圓形攻擊
+                    if (Math.random() < 0.3) {
+                        boss.spinningBirdKick = true;
+                        for (let i = 0; i < 12; i++) {
+                            const angle = (i * Math.PI / 6) + (now * 0.01);
+                            createBossBullet(bossCenterX, bossCenterY, angle, '#00aaff', 'spinning');
+                        }
+                    }
+                    break;
+                    
+                case 'ken':
+                    // 肯的火焰波動拳
+                    if (boss.flameHadoken) {
+                        createBossBullet(bossCenterX, bossCenterY + 50, Math.PI/2, '#ff4400', 'flamehadoken');
+                        // 火焰擴散
+                        for (let i = 0; i < 3; i++) {
+                            createBossBullet(bossCenterX + (i-1) * 30, bossCenterY + 70, Math.PI/2 + (i-1) * 0.4, '#ff6600', 'flame');
+                        }
+                    }
+                    
+                    // 疾風模式
+                    if (Math.random() < 0.2) {
+                        boss.rushMode = true;
+                        boss.speed *= 2;
+                        for (let i = 0; i < 6; i++) {
+                            setTimeout(() => {
+                                createBossBullet(bossCenterX, bossCenterY + 40, Math.PI/2, '#ffaa00', 'rush');
+                            }, i * 100);
+                        }
+                        setTimeout(() => {
+                            boss.rushMode = false;
+                            boss.speed /= 2;
+                        }, 1000);
+                    }
+                    break;
+                    
+                case 'akuma':
+                    // 豪鬼的暗黑波動拳
+                    if (boss.darkHadoken) {
+                        createBossBullet(bossCenterX, bossCenterY + 50, Math.PI/2, '#440000', 'darkhadoken');
+                        // 追蹤彈
+                        const playerAngle = Math.atan2(playerCenterY - bossCenterY, playerCenterX - bossCenterX);
+                        createBossBullet(bossCenterX, bossCenterY + 50, playerAngle, '#660000', 'tracking');
+                    }
+                    
+                    // 瞬獄殺 - 終極攻擊
+                    if (boss.ragingDemon < 100) {
+                        boss.ragingDemon += 2;
+                    } else {
+                        // 發動瞬獄殺
+                        for (let i = 0; i < 20; i++) {
+                            const angle = Math.random() * Math.PI * 2;
+                            const distance = 50 + Math.random() * 100;
+                            createBossBullet(
+                                bossCenterX + Math.cos(angle) * distance,
+                                bossCenterY + Math.sin(angle) * distance,
+                                angle + Math.PI,
+                                '#aa0000',
+                                'ragingdemon'
+                            );
+                        }
+                        boss.ragingDemon = 0;
+                    }
+                    
+                    // 空中火球
+                    if (boss.airFireball && Math.random() < 0.4) {
+                        createBossBullet(bossCenterX - 50, bossCenterY, Math.PI/2 + 0.5, '#ff0000', 'airfireball');
+                        createBossBullet(bossCenterX + 50, bossCenterY, Math.PI/2 - 0.5, '#ff0000', 'airfireball');
+                    }
+                    break;
+                    
+                case 'sagat':
+                    // 沙卡特的老虎射擊
+                    if (boss.tigerShot) {
+                        createBossBullet(bossCenterX, bossCenterY + 50, Math.PI/2, '#ff8800', 'tigershot');
+                        // 高低老虎射擊
+                        if (Math.random() < 0.5) {
+                            createBossBullet(bossCenterX, bossCenterY + 30, Math.PI/2 - 0.3, '#ff8800', 'tigershot');
+                            createBossBullet(bossCenterX, bossCenterY + 70, Math.PI/2 + 0.3, '#ff8800', 'tigershot');
+                        }
+                    }
+                    
+                    // 老虎升擊
+                    if (boss.tigerUppercut && Math.random() < 0.3) {
+                        for (let i = 0; i < 4; i++) {
+                            createBossBullet(bossCenterX + (i-1.5) * 15, bossCenterY, -Math.PI/2, '#ffaa00', 'tigeruppercut');
+                        }
+                    }
+                    break;
+                    
+                case 'vega':
+                    // 維加的爪攻擊 - 快速移動攻擊
+                    if (boss.clawAttack) {
+                        // 快速移動到玩家附近
+                        const moveToX = playerCenterX + (Math.random() - 0.5) * 100;
+                        const moveToY = Math.max(50, Math.min(300, playerCenterY - 50));
+                        boss.x = moveToX - boss.width / 2;
+                        boss.y = moveToY;
+                        
+                        // 爪攻擊
+                        for (let i = 0; i < 8; i++) {
+                            const angle = (i * Math.PI / 4) + (now * 0.05);
+                            createBossBullet(bossCenterX, bossCenterY, angle, '#8800ff', 'claw');
+                        }
+                    }
+                    
+                    // 牆跳攻擊
+                    if (boss.wallJump && Math.random() < 0.25) {
+                        boss.x = Math.random() < 0.5 ? 0 : canvas.width - boss.width;
+                        createBossBullet(bossCenterX, bossCenterY, Math.PI/2, '#aa44ff', 'walljump');
+                    }
+                    break;
+                    
+                case 'balrog':
+                    // 巴洛克的衝刺拳
+                    if (boss.dashPunch) {
+                        // 衝向玩家
+                        const playerAngle = Math.atan2(playerCenterY - bossCenterY, playerCenterX - bossCenterX);
+                        for (let i = 0; i < 3; i++) {
+                            createBossBullet(
+                                bossCenterX,
+                                bossCenterY + 50,
+                                playerAngle + (i-1) * 0.2,
+                                '#0044aa',
+                                'dashpunch'
+                            );
+                        }
+                    }
+                    
+                    // 頭槌攻擊
+                    if (boss.headbutt && Math.random() < 0.4) {
+                        createBossBullet(bossCenterX, bossCenterY, Math.PI/2, '#0066cc', 'headbutt');
+                        // 衝擊波
+                        for (let i = 0; i < 6; i++) {
+                            const angle = Math.PI/2 + (i-2.5) * 0.3;
+                            createBossBullet(bossCenterX, bossCenterY + 40, angle, '#0088ff', 'shockwave');
+                        }
+                    }
+                    break;
+                    
+                case 'bison':
+                    // 拜森的精神力攻擊
+                    if (boss.psychoPower) {
+                        // 精神力波
+                        for (let i = 0; i < 5; i++) {
+                            const angle = Math.PI/2 + (i-2) * 0.4;
+                            createBossBullet(bossCenterX, bossCenterY + 50, angle, '#cc0000', 'psychopower');
+                        }
+                        
+                        // 精神風暴
+                        if (Math.random() < 0.3) {
+                            for (let i = 0; i < 16; i++) {
+                                const angle = (i * Math.PI / 8) + (now * 0.02);
+                                const radius = 80 + Math.sin(now * 0.01 + i) * 20;
+                                createBossBullet(
+                                    bossCenterX + Math.cos(angle) * radius,
+                                    bossCenterY + Math.sin(angle) * radius,
+                                    angle + Math.PI,
+                                    '#ff0000',
+                                    'psychostorm'
+                                );
+                            }
+                        }
+                    }
+                    
+                    // 剪刀腳
+                    if (boss.scissorKick && Math.random() < 0.35) {
+                        // 快速移動攻擊
+                        boss.x = playerCenterX - boss.width / 2;
+                        for (let i = 0; i < 4; i++) {
+                            createBossBullet(bossCenterX + (i-1.5) * 25, bossCenterY + 50, Math.PI/2, '#aa0000', 'scissor');
+                        }
+                    }
+                    
+                    // 瞬移攻擊（最終Boss特權）
+                    if (boss.teleport && Math.random() < 0.2) {
+                        boss.x = Math.random() * (canvas.width - boss.width);
+                        boss.y = Math.random() * 200 + 50;
+                        // 瞬移後爆發攻擊
+                        for (let i = 0; i < 12; i++) {
+                            const angle = (i * Math.PI / 6);
+                            createBossBullet(bossCenterX, bossCenterY, angle, '#ff4400', 'teleportattack');
+                        }
+                    }
+                    break;
             }
             
             boss.lastFire = now;
@@ -2183,8 +3759,15 @@
             
             if (playerDistance < 60) {
                 const damage = Math.max(5, Math.ceil((60 - playerDistance) / 6));
-                health -= damage;
-                createParticles(player.x + player.width/2, player.y + player.height/2, '#ff0000', 8);
+                
+                // 檢查大絕招護盾效果
+                if (!(ultimateActive && ultimateType === 'shield')) {
+                    health -= damage;
+                    createParticles(player.x + player.width/2, player.y + player.height/2, '#ff0000', 8);
+                } else {
+                    // 護盾效果，顯示藍色粒子效果
+                    createParticles(player.x + player.width/2, player.y + player.height/2, '#0088ff', 8);
+                }
             }
             
             // 爆炸視覺效果
@@ -2196,6 +3779,12 @@
         // 更新遊戲狀態
         function update(deltaTime) {
             if (gameState !== 'playing') return;
+            
+            // 更新魔王模式計時器
+            updateBossTimer();
+            
+            // 更新大絕招狀態
+            updateUltimateStatus();
             
             // 長按射擊
             if (keys['Space']) {
@@ -2243,14 +3832,15 @@
                 if (bullet.trail.length > 5) {
                     bullet.trail.shift();
                 }
-                
+
                 if (bullet.angle) {
                     bullet.x += Math.sin(bullet.angle) * bullet.speed;
                     bullet.y -= Math.cos(bullet.angle) * bullet.speed;
                 } else {
                     bullet.y -= bullet.speed;
                 }
-                return bullet.y > -50;
+
+                return bullet.y > -50 && bullet.x > -50 && bullet.x < canvas.width + 50;
             });
 
             // 更新Boss
@@ -2259,7 +3849,9 @@
                 
                 // Boss移動邏輯
                 if (boss.y < 50) {
-                    boss.y += boss.speed;
+                    // 時間減緩效果
+                    const speedMultiplier = (ultimateActive && ultimateType === 'time_slow') ? 0.3 : 1;
+                    boss.y += boss.speed * speedMultiplier;
                 } else {
                     // 到達位置後開始橫向移動
                     boss.x += Math.sin(boss.moveTimer * 0.002) * boss.speed;
@@ -2282,26 +3874,96 @@
             });
 
             // 更新Boss子彈
-            bossBullets = bossBullets.filter(bullet => {
-                if (bullet.type === 'missile') {
-                    // 追蹤飛彈
+            bossBullets = bossBullets.filter((bullet, bulletIndex) => {
+                if (bullet.type === 'missile' && !bullet.isReflected) {
+                    // 追蹤飛彈（只有非反彈子彈才追蹤玩家）
                     const dx = (player.x + player.width/2) - bullet.x;
                     const dy = (player.y + player.height/2) - bullet.y;
                     const angle = Math.atan2(dy, dx);
                     bullet.x += Math.cos(angle) * bullet.speed;
                     bullet.y += Math.sin(angle) * bullet.speed;
+                } else if (bullet.isReflected) {
+                    // 反彈子彈使用新的方向和速度
+                    if (bullet.dx !== undefined && bullet.dy !== undefined) {
+                        bullet.x += bullet.dx;
+                        bullet.y += bullet.dy;
+                    } else {
+                        // 使用角度移動
+                        bullet.x += Math.cos(bullet.angle) * bullet.speed;
+                        bullet.y += Math.sin(bullet.angle) * bullet.speed;
+                    }
+
+                    // 檢查反彈子彈與敵人的碰撞
+                    for (let i = enemies.length - 1; i >= 0; i--) {
+                        const enemy = enemies[i];
+                        if (bullet.x < enemy.x + enemy.width &&
+                            bullet.x + bullet.width > enemy.x &&
+                            bullet.y < enemy.y + enemy.height &&
+                            bullet.y + bullet.height > enemy.y) {
+
+                            enemy.health -= bullet.damage;
+                            createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, bullet.color, 8);
+
+                            if (enemy.health <= 0) {
+                                enemies.splice(i, 1);
+                                score += enemy.points * 2; // 反彈擊殺雙倍分數
+                                credits += enemy.credits * 2;
+                                updateCreditsDisplay();
+                            }
+
+                            // 移除子彈
+                            return false;
+                        }
+                    }
+
+                    // 檢查反彈子彈與BOSS的碰撞
+                    for (let i = bosses.length - 1; i >= 0; i--) {
+                        const boss = bosses[i];
+                        if (bullet.x < boss.x + boss.width &&
+                            bullet.x + bullet.width > boss.x &&
+                            bullet.y < boss.y + boss.height &&
+                            bullet.y + bullet.height > boss.y) {
+
+                            // 先扣護盾（如果有的話）
+                            if (boss.shield && boss.shield > 0) {
+                                const shieldDamage = Math.min(bullet.damage, boss.shield);
+                                boss.shield -= shieldDamage;
+                                const remainingDamage = bullet.damage - shieldDamage;
+                                if (remainingDamage > 0) {
+                                    boss.health -= remainingDamage;
+                                }
+                            } else {
+                                boss.health -= bullet.damage;
+                            }
+
+                            createParticles(boss.x + boss.width/2, boss.y + boss.height/2, bullet.color, 12);
+
+                            if (boss.health <= 0) {
+                                bosses.splice(i, 1);
+                                score += boss.points * 3; // 反彈擊殺BOSS三倍分數
+                                credits += boss.credits * 3;
+                                updateCreditsDisplay();
+                            }
+
+                            // 移除子彈
+                            return false;
+                        }
+                    }
                 } else {
                     bullet.x += Math.cos(bullet.angle) * bullet.speed;
                     bullet.y += Math.sin(bullet.angle) * bullet.speed;
                 }
-                return bullet.x > -50 && bullet.x < canvas.width + 50 && 
+
+                return bullet.x > -50 && bullet.x < canvas.width + 50 &&
                        bullet.y > -50 && bullet.y < canvas.height + 50;
             });
             
             // 更新敵人和特殊能力
             enemies.forEach((enemy, enemyIndex) => {
                 // 基本移動
-                enemy.y += enemy.speed;
+                // 時間減緩效果
+                const speedMultiplier = (ultimateActive && ultimateType === 'time_slow') ? 0.3 : 1;
+                enemy.y += enemy.speed * speedMultiplier;
                 
                 // 特殊能力處理
                 switch (enemy.type) {
@@ -2616,11 +4278,49 @@
                     player.x + player.width > bullet.x &&
                     player.y < bullet.y + bullet.height &&
                     player.y + bullet.height > bullet.y) {
-                    
-                    health -= bullet.damage;
-                    createParticles(player.x + player.width/2, player.y + player.height/2, '#ff0000', 8);
+
+                    // 檢查量子力場反彈效果
+                    if (ultimateActive && ultimateType === 'quantum_field') {
+                        // 反彈子彈，將方向完全反向
+                        if (bullet.angle !== undefined) {
+                            // 有角度的子彈，反轉角度
+                            bullet.angle = bullet.angle + Math.PI;
+                        } else {
+                            // 直線飛行的子彈，設置反向速度
+                            if (bullet.dx && bullet.dy) {
+                                bullet.dx = -bullet.dx;
+                                bullet.dy = -bullet.dy;
+                            } else {
+                                // 垂直飛行的子彈，改為向上飛行
+                                bullet.dx = 0;
+                                bullet.dy = -bullet.speed;
+                            }
+                        }
+
+                        // 反彈特效和屬性
+                        bullet.color = '#00ffff'; // 改變顏色表示反彈
+                        bullet.isReflected = true; // 標記為反彈子彈
+                        bullet.damage *= 2; // 反彈後傷害加倍
+
+                        // 創造量子力場反彈特效
+                        createParticles(player.x + player.width/2, player.y + player.height/2, '#00ffff', 12);
+
+                        // 不移除子彈，讓它反彈
+                        return;
+                    }
+                    // 檢查大絕招護盾效果
+                    else if (ultimateActive && ultimateType === 'shield') {
+                        // 護盾效果，顯示藍色粒子效果
+                        createParticles(player.x + player.width/2, player.y + player.height/2, '#0088ff', 8);
+                        bossBullets.splice(bulletIndex, 1);
+                        return;
+                    } else {
+                        health -= bullet.damage;
+                        createParticles(player.x + player.width/2, player.y + player.height/2, '#ff0000', 8);
+                    }
+
                     bossBullets.splice(bulletIndex, 1);
-                    
+
                     if (health <= 0) {
                         gameState = 'gameOver';
                         document.getElementById('finalScore').textContent = score;
@@ -2660,11 +4360,12 @@
                     
                     switch (powerup.type) {
                         case 'health':
+                            maxHealth += 30; // 增加最大血量
                             health = Math.min(maxHealth, health + 25);
                             break;
                         case 'maxhealth':
-                            maxHealth += 20; // 增加最大血量
-                            health = Math.min(maxHealth, health + 15); // 同時回復一些血量
+                            maxHealth += 50; // 增加最大血量
+                            health = Math.min(maxHealth, health + 30); // 同時回復一些血量
                             break;
                     }
                     
@@ -2677,11 +4378,24 @@
             const dynamicDiff = getDynamicDifficulty();
             
             if (difficulty === 'boss') {
-                // 魔王挑戰模式 - 只生成BOSS
+                // 魔王挑戰模式 - 動態升級系統
+                const elapsed = Date.now() - bossTimerStart;
+                const progressLevel = Math.floor(elapsed / 30000) + 1; // 每30秒升級一次
+
                 bossSpawnTimer += deltaTime;
-                const bossSpawnInterval = Math.max(3000, 8000 - level * 100); // 更短的BOSS生成間隔
-                const maxBosses = Math.min(3, 1 + Math.floor(level / 10)); // 同時可存在的BOSS數量
-                
+                const bossSpawnInterval = Math.max(2000, 6000 - progressLevel * 200); // 隨時間加快生成
+                const maxBosses = Math.min(5, 1 + Math.floor(progressLevel / 3)); // 同時存在更多Boss
+
+                if (bossSpawnTimer > bossSpawnInterval && bosses.length < maxBosses) {
+                    spawnBoss();
+                    bossSpawnTimer = 0;
+                }
+            } else if (difficulty === 'street_fighter') {
+                // 快打旋風模式 - 快速生成快打旋風Boss
+                bossSpawnTimer += deltaTime;
+                const bossSpawnInterval = Math.max(2000, 5000 - level * 50); // 更頻繁的快打旋風Boss
+                const maxBosses = Math.min(4, 2 + Math.floor(level / 8)); // 可存在更多Boss
+
                 if (bossSpawnTimer > bossSpawnInterval && bosses.length < maxBosses) {
                     spawnBoss();
                     bossSpawnTimer = 0;
@@ -2708,24 +4422,7 @@
                 }
             }
             
-            // 升級系統 - 平衡升級機制
-            const scoreRequiredPerLevel = Math.max(200, 400 - level * 2); // 早期升級更容易，後期更難
-            const newLevel = Math.floor(score / scoreRequiredPerLevel) + 1;
-            if (newLevel > level) {
-                level = newLevel;
-                player.powerLevel = level; // 讓玩家武器等級跟著遊戲等級提升
-                health = Math.min(maxHealth, health + 25 + Math.floor(level / 5) * 5); // 升級回血隨等級增加
-                // 定期提升射速和最大血量
-                if (level % 5 === 0) {
-                    player.fireRate = Math.max(60, player.fireRate - 15); // 提升射速
-                }
-                if (level % 10 === 0) {
-                    maxHealth += 20; // 增加血量上限
-                    health = Math.min(maxHealth, health + 50); // 額外回血
-                }
-                updatePowerupIndicator(); // 更新武器顯示
-                autoSaveGame(); // 升級時自動保存
-            }
+            // 移除自動升級系統 - 保持固定等級以維持遊戲平衡
             
             // 更新UI
             document.getElementById('health').textContent = `${health}/${maxHealth}`;
@@ -2740,23 +4437,23 @@
             if (player.powerLevel <= 10) {
                 weaponType = '基礎武器';
             } else if (player.powerLevel <= 25) {
-                const elementTypes = ['火元素', '冰元素', '雷元素'];
+                const elementTypes = ['1等', '2等', '3等'];
                 const typeIndex = Math.floor((player.powerLevel - 11) / 5);
                 weaponType = elementTypes[typeIndex] || '元素武器';
             } else if (player.powerLevel <= 50) {
-                const energyTypes = ['水藍機光', '光輝機關槍', '宇宙風暴'];
+                const energyTypes = ['4等', '5等', '6等'];
                 const typeIndex = Math.floor((player.powerLevel - 26) / 8);
                 weaponType = energyTypes[typeIndex] || '能量武器';
             } else if (player.powerLevel <= 75) {
-                const magicTypes = ['喚星術', '時空主軸 ', '彗星雨'];
+                const magicTypes = ['7等', '8等 ', '9等'];
                 const typeIndex = Math.floor((player.powerLevel - 51) / 8);
                 weaponType = magicTypes[typeIndex] || '魔法武器';
             } else if (player.powerLevel <= 99) {
-                const legendaryTypes = ['彩虹射線'];
+                const legendaryTypes = ['10等'];
                 const typeIndex = Math.floor((player.powerLevel - 76) / 8);
                 weaponType = legendaryTypes[typeIndex] || '傳說武器';
             } else if (player.powerLevel === 100) {
-                weaponType = '🌟 終極武器 🌟';
+                weaponType = '🌟 獲勝 🌟';
             }
             
             let modeText = difficulty === 'boss' ? '🔥 魔王挑戰 🔥' : difficulty;
@@ -2880,7 +4577,7 @@
                         
                     case 'plasma':
                         // 電漿特效
-                        const time = Date.now() * 0.01;
+                        const plasmaTime = Date.now() * 0.01;
                         ctx.fillStyle = bullet.color;
                         ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
                         // 電漿環
@@ -3098,7 +4795,7 @@
                         ctx.arc(bullet.x + bullet.width/2, bullet.y + bullet.height/2, 10 * pulse, 0, Math.PI * 2);
                         ctx.stroke();
                         break;
-                        
+
                     default:
                         // 普通子彈
                         ctx.fillStyle = bullet.color;
@@ -3553,12 +5250,33 @@
             gameState = 'playing';
             score = 0;
             level = 1;
+
+            // 重置基礎血量
             health = 100;
             maxHealth = 100;
+
             player.x = 375;
             player.y = 500;
             player.powerLevel = 1;
             player.fireRate = weapons[equippedWeapon].fireRate;
+
+            // 應用盔甲效果（這會根據裝備的盔甲調整血量）
+            applyArmorEffects();
+            
+            // 計時模式設置
+            if (difficulty === 'boss' || difficulty === 'street_fighter') {
+                bossTimerStart = Date.now();
+                document.getElementById('bossTimer').style.display = 'block';
+                
+                // 設置對應的時間限制
+                if (difficulty === 'street_fighter') {
+                    bossTimeLimit = streetFighterTimeLimit;
+                } else {
+                    bossTimeLimit = 5 * 60 * 1000; // 魔王挑戰 5分鐘
+                }
+            } else {
+                document.getElementById('bossTimer').style.display = 'none';
+            }
             bullets = [];
             enemies = [];
             bosses = [];
@@ -3583,20 +5301,27 @@
                 const saveData = localStorage.getItem('cosmosShootingSave');
                 if (saveData) {
                     const data = JSON.parse(saveData);
-                    
-                    // 靜默載入存檔數據
+
+                    // 靜默載入存檔數據（但不載入遊戲內等級）
                     credits = data.credits || 0;
-                    level = Math.max(data.level || 1, 1);
+                    // level 保持為 1，不從存檔載入，確保每次遊戲開始時重置
                     maxHealth = data.maxHealth || 100;
                     ownedWeapons = data.ownedWeapons || ['basic'];
                     ownedBullets = data.ownedBullets || ['normal'];
+                    ownedArmors = data.ownedArmors || ['none'];
+                    ownedUltimates = data.ownedUltimates || ['shield'];
                     equippedWeapon = data.equippedWeapon || 'basic';
                     equippedBullet = data.equippedBullet || 'normal';
+                    equippedArmor = data.equippedArmor || 'none';
+                    equippedUltimate = data.equippedUltimate || 'shield';
                     difficulty = data.difficulty || 'easy';
                     
                     // 更新UI顯示
                     updateCreditsDisplay();
                     updateAllDisplays();
+                    
+                    // 應用盔甲效果
+                    applyArmorEffects();
                 }
             } catch (error) {
                 console.log('自動載入存檔失敗:', error);
@@ -3608,6 +5333,7 @@
         updatePowerupIndicator();
         updateCreditsDisplay();
         autoLoadGame(); // 自動載入存檔
+        applyArmorEffects(); // 應用盔甲效果
         showWeapons(); // 預設顯示武器頁面
         requestAnimationFrame(gameLoop);
     </script>
