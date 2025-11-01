@@ -231,6 +231,7 @@
             <div>生命值: <span id="health">100/100</span></div>
             <div>分數: <span id="score">0</span></div>
             <div>等級: <span id="level">1</span></div>
+            <div>經驗值: <span id="experience">0</span>/<span id="experienceToNext">100</span></div>
             <div>大招: <span id="ultimateStatus">準備就緒</span> (X鍵)</div>
             <div id="bossTimer" style="display: none;">剩餘時間: <span id="remainingTime">05:00</span></div>
         </div>
@@ -315,6 +316,8 @@
         let gameState = 'menu'; // 'menu', 'start', 'playing', 'gameOver', 'victory'
         let score = 0;
         let level = 1;
+        let experience = 0; // 經驗值
+        let experienceToNextLevel = 100; // 升級所需經驗值
         let health = 100;
         let maxHealth = 100;
         let credits = 0; // 遊戲貨幣
@@ -1770,6 +1773,11 @@
                                 enemies.splice(enemies.indexOf(enemy), 1);
                                 score += enemy.points;
                                 credits += enemy.credits;
+
+                                // 獲得經驗值
+                                const expReward = Math.ceil(enemy.points * 0.5);
+                                gainExperience(expReward);
+
                                 updateCreditsDisplay();
                             }
                         }
@@ -1806,6 +1814,11 @@
                                 bosses.splice(bosses.indexOf(boss), 1);
                                 score += boss.points * 2;
                                 credits += boss.credits * 2;
+
+                                // 獲得經驗值（Boss擊殺有豐厚獎勵）
+                                const expReward = Math.ceil(boss.points * 1.5);
+                                gainExperience(expReward);
+
                                 updateCreditsDisplay();
                             }
                         }
@@ -1836,6 +1849,11 @@
                         enemies.splice(index, 1);
                         score += enemy.points * 2;
                         credits += enemy.credits * 2;
+
+                        // 獲得經驗值（爆炸擊殺有額外獎勵）
+                        const expReward = Math.ceil(enemy.points * 1.0); // 經驗值為點數的100%
+                        gainExperience(expReward);
+
                         updateCreditsDisplay();
                     }
                 });
@@ -1867,6 +1885,11 @@
                             bosses.splice(index, 1);
                             score += boss.points * 3;
                             credits += boss.credits * 3;
+
+                            // 獲得經驗值（爆炸擊殺Boss有額外獎勵）
+                            const expReward = Math.ceil(boss.points * 2.0); // 經驗值為點數的200%
+                            gainExperience(expReward);
+
                             updateCreditsDisplay();
                         }
                     }
@@ -1928,6 +1951,11 @@
                                 enemies.splice(index, 1);
                                 score += enemy.points;
                                 credits += enemy.credits;
+
+                                // 獲得經驗值
+                                const expReward = Math.ceil(enemy.points * 0.5);
+                                gainExperience(expReward);
+
                                 updateCreditsDisplay();
                             }
                         }
@@ -2220,11 +2248,46 @@
             document.getElementById('shopCredits').textContent = credits;
         }
 
+        // 升級系統
+        function gainExperience(amount) {
+            experience += amount;
+            updateExperienceDisplay();
+
+            // 檢查是否可以升級
+            while (experience >= experienceToNextLevel) {
+                levelUp();
+            }
+        }
+
+        function levelUp() {
+            experience -= experienceToNextLevel;
+            level++;
+            experienceToNextLevel = Math.floor(experienceToNextLevel * 1.2); // 每次升級所需經驗增加20%
+
+            // 升級獎勵
+            maxHealth += 10; // 每升級增加10點最大生命值
+            health = Math.min(health + 5, maxHealth); // 恢復5點生命值，不超過最大值
+            credits += level * 10; // 獲得等級*10的金幣獎勵
+
+            updateExperienceDisplay();
+            updateCreditsDisplay();
+            document.getElementById('health').textContent = `${health}/${maxHealth}`;
+        }
+
+        function updateExperienceDisplay() {
+            document.getElementById('level').textContent = level;
+            document.getElementById('experience').textContent = experience;
+            document.getElementById('experienceToNext').textContent = experienceToNextLevel;
+        }
+
+
         // 遊戲存檔功能
         function saveGame() {
             const saveData = {
                 credits: credits,
-                level: 1, // 固定保存為1，確保不影響遊戲平衡
+                level: level, // 保存實際等級
+                experience: experience, // 保存經驗值
+                experienceToNextLevel: experienceToNextLevel, // 保存升級所需經驗值
                 maxHealth: maxHealth,
                 ownedWeapons: ownedWeapons,
                 ownedBullets: ownedBullets,
@@ -2256,9 +2319,11 @@
                 
                 const data = JSON.parse(saveData);
                 
-                // 載入存檔數據（但不載入遊戲內等級）
+                // 載入存檔數據（包含等級系統）
                 credits = data.credits || 0;
-                // level 保持為 1，不從存檔載入，確保每次遊戲開始時重置
+                level = data.level || 1; // 載入等級
+                experience = data.experience || 0; // 載入經驗值
+                experienceToNextLevel = data.experienceToNextLevel || 100; // 載入升級所需經驗值
                 maxHealth = data.maxHealth || 100;
                 ownedWeapons = data.ownedWeapons || ['basic'];
                 ownedBullets = data.ownedBullets || ['normal'];
@@ -2272,6 +2337,7 @@
                 
                 // 更新UI顯示
                 updateCreditsDisplay();
+                updateExperienceDisplay();
                 updateAllDisplays();
                 
                 alert('遊戲載入成功！\n存檔時間: ' + (data.saveDate || '未知'));
@@ -3744,6 +3810,11 @@
                         const dynamicDiff = getDynamicDifficulty();
                         const creditReward = Math.ceil(enemy.credits * dynamicDiff.creditMultiplier);
                         credits += creditReward;
+
+                        // 獲得經驗值
+                        const expReward = Math.ceil(enemy.points * 0.5);
+                        gainExperience(expReward);
+
                         updateCreditsDisplay();
                         createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, '#ffff00', 8);
                         spawnPowerup(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
@@ -3908,6 +3979,11 @@
                                 enemies.splice(i, 1);
                                 score += enemy.points * 2; // 反彈擊殺雙倍分數
                                 credits += enemy.credits * 2;
+
+                                // 獲得經驗值（反彈擊殺有額外獎勵）
+                                const expReward = Math.ceil(enemy.points * 1.0); // 經驗值為點數的100%
+                                gainExperience(expReward);
+
                                 updateCreditsDisplay();
                             }
 
@@ -4193,11 +4269,16 @@
                             if (enemy.explodeOnDeath) {
                                 createExplosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
                             }
-                            
+
                             score += enemy.points;
                             const dynamicDiff = getDynamicDifficulty();
                             const creditReward = Math.ceil(enemy.credits * dynamicDiff.creditMultiplier);
                             credits += creditReward;
+
+                            // 獲得經驗值
+                            const expReward = Math.ceil(enemy.points * 0.5); // 經驗值為點數的50%
+                            gainExperience(expReward);
+
                             updateCreditsDisplay();
                             createParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, '#ffff00', 8);
                             spawnPowerup(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
@@ -4238,6 +4319,11 @@
                             score += boss.points;
                             const creditReward = Math.ceil(boss.credits * difficultySettings[difficulty].creditMultiplier);
                             credits += creditReward;
+
+                            // 獲得經驗值（Boss擊殺有豐厚獎勵）
+                            const expReward = Math.ceil(boss.points * 1.5); // 經驗值為點數的150%
+                            gainExperience(expReward);
+
                             updateCreditsDisplay();
                             createParticles(boss.x + boss.width/2, boss.y + boss.height/2, '#ffff00', 15);
                             spawnPowerup(boss.x + boss.width/2, boss.y + boss.height/2, true);
@@ -4422,12 +4508,12 @@
                 }
             }
             
-            // 移除自動升級系統 - 保持固定等級以維持遊戲平衡
+            // 升級系統已重新實現 - 玩家可以透過擊殺敵人獲得經驗值並升級
             
             // 更新UI
             document.getElementById('health').textContent = `${health}/${maxHealth}`;
             document.getElementById('score').textContent = score;
-            document.getElementById('level').textContent = level;
+            updateExperienceDisplay(); // 使用專用函數更新經驗值和等級顯示
         }
         
         function updatePowerupIndicator() {
@@ -5250,6 +5336,8 @@
             gameState = 'playing';
             score = 0;
             level = 1;
+            experience = 0; // 重置經驗值
+            experienceToNextLevel = 100; // 重置升級所需經驗值
 
             // 重置基礎血量
             health = 100;
@@ -5288,6 +5376,7 @@
             hideAllScreens();
             updatePowerupIndicator();
             updateCreditsDisplay();
+            updateExperienceDisplay(); // 更新經驗值顯示
         }
         
         // 重新開始遊戲
@@ -5302,9 +5391,11 @@
                 if (saveData) {
                     const data = JSON.parse(saveData);
 
-                    // 靜默載入存檔數據（但不載入遊戲內等級）
+                    // 靜默載入存檔數據（包含等級系統）
                     credits = data.credits || 0;
-                    // level 保持為 1，不從存檔載入，確保每次遊戲開始時重置
+                    level = data.level || 1; // 載入等級
+                    experience = data.experience || 0; // 載入經驗值
+                    experienceToNextLevel = data.experienceToNextLevel || 100; // 載入升級所需經驗值
                     maxHealth = data.maxHealth || 100;
                     ownedWeapons = data.ownedWeapons || ['basic'];
                     ownedBullets = data.ownedBullets || ['normal'];
@@ -5318,6 +5409,7 @@
                     
                     // 更新UI顯示
                     updateCreditsDisplay();
+                    updateExperienceDisplay();
                     updateAllDisplays();
                     
                     // 應用盔甲效果
